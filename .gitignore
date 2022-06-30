@@ -13,3 +13,4 @@ bottomupbabyyy-test-*
 *.o
 *.obj
 *.lst
+grammar/*
