@@ -1,0 +1,15 @@
+.dub
+docs.json
+__dummy.html
+docs/
+/bottomupbabyyy
+bottomupbabyyy.so
+bottomupbabyyy.dylib
+bottomupbabyyy.dll
+bottomupbabyyy.a
+bottomupbabyyy.lib
+bottomupbabyyy-test-*
+*.exe
+*.o
+*.obj
+*.lst
