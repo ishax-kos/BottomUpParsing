@@ -64,24 +64,26 @@ void addAction(ref Action[][] tblAction, ulong state, ulong symbol, Action newAc
 struct TableContext {
     Action[][] tblAction;
     int[][] tblGoto;
+
+    GramSymbol[] symbolKey;
 }
 
 TableContext parseGrammar(string input) {
     auto ctx = PContext.fromString(input);
 
-    GramSymbol[] symbolTable = ctx.genSymbolTable;
-    Item[][] states = ctx.findStateSets(symbolTable);
+    GramSymbol[] symbolTable = genSymbolTable(ctx.allSymbols.dup);
+    Item[][] states = ctx.findStateSets();
     
 
-    ushort[GramSymbol] symbolIndex;
+    // ushort[GramSymbol] symbolIndex;
     ushort[GramSymbol] terminals;
     ushort[GramSymbol] nonTerminals;
     
     ushort ct, cn;
-    foreach (i, sym; symbolTable) {
+    foreach_reverse (i, sym; symbolTable) {
         if (i > ushort.max) {throw new Exception("Too many symbols.");}
 
-        symbolIndex[sym] = cast(ushort) i;
+        // symbolIndex[sym] = cast(ushort) i;
         sym.match!( 
             (Empty _) {},
             (NonTerminal _) {
@@ -110,7 +112,7 @@ TableContext parseGrammar(string input) {
         foreach(f, item; set) {
             if (item.empty) {
                 if (item == ctx.item(0, 1)) {
-                    enum eoi = 0;
+                    uint eoi = terminals[GramSymbol.eoi];
                     tblAction.addAction(setIndex, eoi, Action(Accept));
                 }
                 else {
@@ -119,7 +121,7 @@ TableContext parseGrammar(string input) {
                         (NonTerminal _) {}, (Empty _) {},
                         (_) {//Terminal
                             tblAction.addAction(
-                                setIndex, symbolIndex[sym], 
+                                setIndex, terminals[sym], 
                                 Action(Reduce, cast(ushort) 
                                     ctx.productions.countUntil(item.production))
                             );
@@ -135,7 +137,7 @@ TableContext parseGrammar(string input) {
                         (NonTerminal _) {}, (Empty _) {},
                         (_) {
                             if (setj == findItemGoto(ctx.productions, set, itemFront)) {
-                                ushort index = symbolIndex[itemFront];
+                                ushort index = terminals[itemFront];
                                 tblAction.addAction(setIndex, index, Action(Shift, cast(ushort) jsetIndex));
                             }
                         }
@@ -154,13 +156,17 @@ TableContext parseGrammar(string input) {
             a++;
         }
     }
-    return TableContext(tblAction, tblGoto);
+    GramSymbol[] terms = new GramSymbol[terminals.length];
+    foreach(k, v; terminals) {terms[v] = k;}
+
+    return TableContext(tblAction, tblGoto, terms);
 }
 
 
 
-/+
+//+
 unittest {
+    import std.conv;
     import std.stdio;
     writeln(" ~~ ~~~~ ~~ ",__FUNCTION__," ~~ ~~~~ ~~ ");
     auto ctx = parseGrammar(q{
@@ -169,8 +175,7 @@ unittest {
         F -> ( E ) | id;
     });
 
-
-    writefln!"  %(%4s%)"(iota(1,7));
+    writefln!"    %-(%=4s%)"(ctx.symbolKey.map!(to!string));
     foreach(i, row; ctx.tblAction) {
         writef!"%3s["(i);
         foreach(item; row) {

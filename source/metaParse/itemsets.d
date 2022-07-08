@@ -56,25 +56,19 @@ struct Item {
 
     string toString() pure {
         auto sym = production.symbols.map!(a=>a.toGramString);
-        string tbody = sym[0..position].join() ~ "·" ~ sym[position..$].join();
+        string tbody = sym[0..position].join(" ") ~ "·" ~ sym[position..$].join(" ");
         return production.result.str ~ " -> " ~ tbody;
     }
-    // string toString() pure {
-    //     string tbody;
-    //      = production.dup;
-    //     tbody.reserve = p.length;
-
-    //     {size_t i = 0;
-    //     while (i < p.length) {
-    //         auto sym = &p.symbols[i];
-            
-    //         if (i == position) {tbody ~= "·";}
-    //         tbody ~= sym.toGramString;
-
-    //         i += 1;
-    //     }}
-
-    //     return production.result.str ~ " -> " ~ tbody;
+    // int value(PContext ctx) const {
+    //     ctx.
+    //     int ret = productions;
+    //     if (ret == 0) {
+    //         ret = 
+    //             position > other.position ? 1 : 
+    //             position < other.position ? -1 : 
+    //             0;
+    //     }
+    //     return ret;
     // }
 }
 
@@ -90,10 +84,6 @@ if (isInputRange!T && is(typeof(items.front) == Item))
 {
     import std.stdio;
     Item[] j = items.array;
-    debug {
-        writeln("productions ", productions);
-        writeln("items ", items);
-    }
     uint i;
     while (true) {
         ulong jLength = j.length;
@@ -101,14 +91,8 @@ if (isInputRange!T && is(typeof(items.front) == Item))
             GramSymbol symbol = item.front;
             symbol.match!(
                 (NonTerminal nt) {
-                    debug {
-                        writeln("nonterminal ", i++, " ", nt);
-                    }
                     foreach (pindex, prod; productions) {
                         if (sum(prod.result) == symbol) {
-                            debug {
-                                writeln("prod ", prod);
-                            }
                             j.insert(Item(prod, 0));
                         }
                     }
@@ -122,28 +106,31 @@ if (isInputRange!T && is(typeof(items.front) == Item))
         if (jLength == j.length) {
             break;
         }
-        debug {
-            writeln("closes ", i++, " ", j);
-        }
     }
     return j;
 }
 
 
 Item[] findItemGoto(IProduction[] productions, Item[] items, GramSymbol symbol) {
-    import std.stdio;
+    // import std.stdio;
     import std.algorithm;
     import std.range;
-    
-    Item[] j = findItemClosure(productions, items[].filter!(
-        item => item.front == symbol
-    ).map!(item => item + 1).array);
+    Item[] j;
+    foreach (item; items) {
+        if (item.front == symbol) {
+            j ~= item + 1;
+        }
+        else {
+            
+        // writeln(item.front.tupleof, " isn't ", symbol.tupleof);
+        }
+    }
 
-    return j;
+    return findItemClosure(productions, j);
 }
 
 
-Item[][] findStateSets(PContext ctx, GramSymbol[] symbolTable) {
+Item[][] findStateSets(PContext ctx) {
     import std.stdio;
     Item aug = ctx.item(0, 0);
     Item[][] c = [findItemClosure(ctx.productions, [aug])];
@@ -151,10 +138,12 @@ Item[][] findStateSets(PContext ctx, GramSymbol[] symbolTable) {
     while (true) {
         clen = c.length;
         foreach (itemSet; c) { 
-            foreach (symbol; symbolTable) {
-                Item[] gotoo = findItemGoto(ctx.productions, itemSet, symbol);
-                if (!gotoo.empty) {
-                    c.insert(gotoo);
+            foreach (symbol; ctx.allSymbols) {
+                if (symbol!=GramSymbol.empty) {
+                    Item[] gotoo = findItemGoto(ctx.productions, itemSet, symbol);
+                    if (!gotoo.empty) {
+                        c.insert(gotoo);
+                    }
                 }
             } 
         }
@@ -173,12 +162,12 @@ Item item(PContext ctx, int prod, int pos) {
 }
 
 
-GramSymbol[] genSymbolTable(PContext ctx) {
+GramSymbol[] genSymbolTable(GramSymbol[] allSymbols) pure {
     import std.stdio;
 
     string[] nterm;
     string[] term;
-    foreach (sym; ctx.allSymbols) {
+    foreach (sym; allSymbols) {
         sym.match!(
             (NonTerminal a) { nterm ~= a.str; },
             (Terminal a) { term ~= a.str; },
@@ -207,15 +196,16 @@ unittest {
         F -> ( E ) | id;
     });
     auto items = [ctx.item(0,0)];
-    writeln(items);
+    writefln!"Productions:\n%(    %s\n%)"(ctx.productions);
     auto closure = findItemClosure(ctx.productions, items);
-    // auto goTo = findItemGoto(ctx.productions, items, GramSymbol.nonTerminal("E"));
-    writefln!"Closure:\n%s"(closure);
-    // writefln!"Goto:\n%s"(goTo);
+    items = [ctx.item(0,1), ctx.item(1,1)];
+    auto goTo = findItemGoto(ctx.productions, items, GramSymbol.terminal("+"));
+    writefln!"Closure:\n%(    %s\n%)"(closure);
+    writefln!"Goto:\n%s"(goTo);
 
-    /+
-    GramSymbol[] symbolTable = ctx.genSymbolTable;
-    auto states = findStateSets(ctx, symbolTable);
+    //+
+    auto states = findStateSets(ctx);
+    writeln(ctx.allSymbols);
     foreach(i,state; states) {
         writefln!"[%s]\n%-(    %s\n%)\n"(i, state);
     }// +/

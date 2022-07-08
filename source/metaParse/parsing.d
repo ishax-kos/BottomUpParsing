@@ -37,6 +37,7 @@ public class ParseContext {
         auto baseCtx = InputContext.fromString(s);
         auto ctx = new ParseContext();
         ctx.productions = baseCtx.parseProductions().dup;
+        // import metaparse.itemsets: genSymbolTable;
         ctx.allSymbols = baseCtx.allSymbols.dup;
         import std.stdio;
         return cast(immutable) ctx;
@@ -47,8 +48,6 @@ public class ParseContext {
 private:
 
 Production[] parseProductions(InputContext ctx) pure {
-    ctx.getSymbol(GramSymbol.eoi);
-    ctx.getSymbol(GramSymbol.empty);
 
     Production[] prods;
     while (!ctx.input.empty()) {
@@ -57,6 +56,8 @@ Production[] parseProductions(InputContext ctx) pure {
             break;
         prods ~= parseRule(ctx);
     }
+    ctx.getSymbol(GramSymbol.eoi);
+    ctx.getSymbol(GramSymbol.empty);
     Production aug = augmentProduction(prods[0]);
     // auto newCtx = cast(ParseContext) ctx;
     return aug~prods;

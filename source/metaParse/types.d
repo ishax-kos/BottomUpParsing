@@ -113,6 +113,6 @@ class Production {
     override
     string toString() const {
         auto sym = symbols.map!(a=>a.toGramString);
-        return result.str ~ " -> " ~ sym.join();
+        return result.str ~ " -> " ~ sym.join(" ");
     }
 }
