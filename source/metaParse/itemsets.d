@@ -38,43 +38,44 @@ int insert(T)(ref T[] s, T t) {
 }
 
 struct Item {
-    immutable IProduction* production;
+    immutable IProduction production;
     uint position;
 
-    bool empty() {
+    bool empty() pure {
         return (position >= production.length);
     }
-    GramSymbol front() {
+    GramSymbol front() pure {
         if (empty) {return GramSymbol.empty;}
         else {
             return production.symbols[position];
         }
     }
-    auto opBinary(string op, R)(R rhs) {
+    auto opBinary(string op, R)(R rhs) pure {
         return Item(production, mixin("position ", op, " rhs"));
     }
 
-    // string toString() {
-    //     auto sym = production.symbols.map!(a=>a.toGramString);
-    //     string tbody = sym[0..position].join() ~ "·" ~ sym[position..$].join();
-    //     return production.result.str ~ " -> " ~ tbody;
-    // }
-    string toString() {
-        string tbody;
-        tbody.reserve = production.length;
-
-        {size_t i = 0;
-        while (i < production.symbols.length) {
-            auto sym = &production.symbols[i];
-            
-            if (i == position) {tbody ~= "·";}
-            tbody ~= sym.toGramString;
-
-            i += 1;
-        }}
-
+    string toString() pure {
+        auto sym = production.symbols.map!(a=>a.toGramString);
+        string tbody = sym[0..position].join() ~ "·" ~ sym[position..$].join();
         return production.result.str ~ " -> " ~ tbody;
     }
+    // string toString() pure {
+    //     string tbody;
+    //      = production.dup;
+    //     tbody.reserve = p.length;
+
+    //     {size_t i = 0;
+    //     while (i < p.length) {
+    //         auto sym = &p.symbols[i];
+            
+    //         if (i == position) {tbody ~= "·";}
+    //         tbody ~= sym.toGramString;
+
+    //         i += 1;
+    //     }}
+
+    //     return production.result.str ~ " -> " ~ tbody;
+    // }
 }
 
 T1 transmute(T1, T2)(T2 item) if (T1.sizeof == T2.sizeof) {
@@ -84,19 +85,31 @@ T1 transmute(T1, T2)(T2 item) if (T1.sizeof == T2.sizeof) {
 
 alias QGramSymbol = Nullable!(GramSymbol, GramSymbol(Empty()));
 
-Item[] findItemClosure(T)(IProduction[] productions, T items) 
+Item[] findItemClosure(T)(IProduction[] productions, T items)
 if (isInputRange!T && is(typeof(items.front) == Item)) 
 {
+    import std.stdio;
     Item[] j = items.array;
+    debug {
+        writeln("productions ", productions);
+        writeln("items ", items);
+    }
+    uint i;
     while (true) {
         ulong jLength = j.length;
         foreach (Item item; j) {
             GramSymbol symbol = item.front;
             symbol.match!(
-                (NonTerminal _) {
+                (NonTerminal nt) {
+                    debug {
+                        writeln("nonterminal ", i++, " ", nt);
+                    }
                     foreach (pindex, prod; productions) {
-                        if (GramSymbol(prod.result) == symbol) {
-                            j.insert(Item(&prod, 0));
+                        if (sum(prod.result) == symbol) {
+                            debug {
+                                writeln("prod ", prod);
+                            }
+                            j.insert(Item(prod, 0));
                         }
                     }
                 },
@@ -108,6 +121,9 @@ if (isInputRange!T && is(typeof(items.front) == Item))
 
         if (jLength == j.length) {
             break;
+        }
+        debug {
+            writeln("closes ", i++, " ", j);
         }
     }
     return j;
@@ -151,7 +167,7 @@ Item[][] findStateSets(PContext ctx, GramSymbol[] symbolTable) {
 Item item(PContext ctx, int prod, int pos) {
     assert(ctx.productions[prod].symbols.length >= pos);
     return Item(
-        &ctx.productions[prod],
+        ctx.productions[prod],
         pos
     );
 }
@@ -193,9 +209,9 @@ unittest {
     auto items = [ctx.item(0,0)];
     writeln(items);
     auto closure = findItemClosure(ctx.productions, items);
-    auto goTo = findItemGoto(ctx.productions, items, GramSymbol.nonTerminal("E"));
+    // auto goTo = findItemGoto(ctx.productions, items, GramSymbol.nonTerminal("E"));
     writefln!"Closure:\n%s"(closure);
-    writefln!"Goto:\n%s"(goTo);
+    // writefln!"Goto:\n%s"(goTo);
 
     /+
     GramSymbol[] symbolTable = ctx.genSymbolTable;

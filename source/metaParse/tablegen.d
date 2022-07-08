@@ -121,7 +121,7 @@ TableContext parseGrammar(string input) {
                             tblAction.addAction(
                                 setIndex, symbolIndex[sym], 
                                 Action(Reduce, cast(ushort) 
-                                    ctx.productions.countUntil(*item.production))
+                                    ctx.productions.countUntil(item.production))
                             );
                         }
                     );
@@ -159,7 +159,7 @@ TableContext parseGrammar(string input) {
 
 
 
-
+/+
 unittest {
     import std.stdio;
     writeln(" ~~ ~~~~ ~~ ",__FUNCTION__," ~~ ~~~~ ~~ ");
@@ -182,6 +182,4 @@ unittest {
 }
 
 
-// void main() {
-    
-// }
+// +/

@@ -72,10 +72,10 @@ struct GramSymbol {
             sum = SumType!(SymbolTypes)(node);
         }
     }
-    string toString() const {
+    string toString() const pure {
         return toGramString();
     }
-    string toGramString() const {
+    string toGramString() const pure {
         return sum.match!(
             (Empty _) => "_",
             (EndOfInput _) => "$",
@@ -84,15 +84,25 @@ struct GramSymbol {
     }
 }
 
-// insert
+
+GramSymbol sum(T)(T value) pure {
+    GramSymbol g;
+    g.sum = GramSymbol.Sum(value);
+    return g;
+}
+
 
 /// Symbolic IProduction
 alias IProduction = immutable Production;
-struct Production {
+class Production {
     NonTerminal result;
     GramSymbol[] symbols;
     alias symbols this;
     
+    this(NonTerminal a, GramSymbol[] b) pure {
+        result = a;
+        symbols = b;
+    }
     // ref auto opIndex(size_t index) const {
     //     return symbols[index];
     // }
@@ -100,7 +110,7 @@ struct Production {
     // size_t length() const {
     //     return symbols.length;
     // }
-    
+    override
     string toString() const {
         auto sym = symbols.map!(a=>a.toGramString);
         return result.str ~ " -> " ~ sym.join();

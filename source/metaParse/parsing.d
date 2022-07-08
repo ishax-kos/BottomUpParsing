@@ -68,7 +68,7 @@ Production augmentProduction(ref Production startProd) pure {
     NonTerminal augSym = NonTerminal(startSym.str ~ "'");
     GramSymbol g;
     g.sum = GramSymbol.Sum(startSym);
-    return Production(augSym, [g]);
+    return new Production(augSym, [g]);
 }
 
 
@@ -129,7 +129,7 @@ Production[] parseRule(InputContext ctx) pure {
     }
     Production[] prods;
     foreach (list; allSymbols) {
-        prods ~= Production(name, list);
+        prods ~= new Production(name, list);
     }
     return prods;
 }
