@@ -1,6 +1,0 @@
-{
-    "files.associations": {
-        "*.yacc": "yacc",
-        "*.grammar": "cpp"
-    }
-}
