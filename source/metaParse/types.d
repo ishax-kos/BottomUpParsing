@@ -31,7 +31,7 @@ alias SymbolTypes = AliasSeq!(NonTerminal, Terminal, Empty, EndOfInput);
 struct GramSymbol {
     SumType!(SymbolTypes) sum;
     alias sum this;
-
+    alias Sum = typeof(sum);
     int opCmp(const GramSymbol g2) const {
         import std.algorithm.comparison : cmp;
 
@@ -52,16 +52,20 @@ struct GramSymbol {
         )(this, g2);
     }
 
-    static GramSymbol nonTerminal(string value = "") {
-        return GramSymbol(NonTerminal(value));
+    static GramSymbol nonTerminal(string value = "") pure {
+        GramSymbol g;
+        g.sum = NonTerminal(value);
+        return g;
     }
 
-    static GramSymbol terminal(string value = "") {
-        return GramSymbol(Terminal(value));
+    static GramSymbol terminal(string value = "") pure {
+        GramSymbol g;
+        g.sum = Terminal(value);
+        return g;
     }
 
-    static GramSymbol empty = GramSymbol(Empty());
-    static GramSymbol eoi = GramSymbol(EndOfInput());
+    enum GramSymbol empty = GramSymbol(Empty());
+    enum GramSymbol eoi = GramSymbol(EndOfInput());
 
     static foreach (T; SymbolTypes) {
         this(T node) {
@@ -73,9 +77,9 @@ struct GramSymbol {
     }
     string toGramString() const {
         return sum.match!(
-            (nt) => nt.str,
             (Empty _) => "_",
-            (EndOfInput _) => "$"
+            (EndOfInput _) => "$",
+            (e) => e.str,
         );
     }
 }
@@ -88,4 +92,17 @@ struct Production {
     NonTerminal result;
     GramSymbol[] symbols;
     alias symbols this;
+    
+    // ref auto opIndex(size_t index) const {
+    //     return symbols[index];
+    // }
+
+    // size_t length() const {
+    //     return symbols.length;
+    // }
+    
+    string toString() const {
+        auto sym = symbols.map!(a=>a.toGramString);
+        return result.str ~ " -> " ~ sym.join();
+    }
 }

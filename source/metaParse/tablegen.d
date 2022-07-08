@@ -162,6 +162,7 @@ TableContext parseGrammar(string input) {
 
 unittest {
     import std.stdio;
+    writeln(" ~~ ~~~~ ~~ ",__FUNCTION__," ~~ ~~~~ ~~ ");
     auto ctx = parseGrammar(q{
         E -> E + T | T;
         T -> T * F | F;

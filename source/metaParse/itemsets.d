@@ -54,11 +54,25 @@ struct Item {
         return Item(production, mixin("position ", op, " rhs"));
     }
 
+    // string toString() {
+    //     auto sym = production.symbols.map!(a=>a.toGramString);
+    //     string tbody = sym[0..position].join() ~ "·" ~ sym[position..$].join();
+    //     return production.result.str ~ " -> " ~ tbody;
+    // }
     string toString() {
-        import std.conv;
-        import std.format;
-        auto sym = production.symbols.map!(a=>a.toGramString);
-        string tbody = chain( sym[0..position], ["·"], sym[position..$]).join();
+        string tbody;
+        tbody.reserve = production.length;
+
+        {size_t i = 0;
+        while (i < production.symbols.length) {
+            auto sym = &production.symbols[i];
+            
+            if (i == position) {tbody ~= "·";}
+            tbody ~= sym.toGramString;
+
+            i += 1;
+        }}
+
         return production.result.str ~ " -> " ~ tbody;
     }
 }
@@ -70,9 +84,6 @@ T1 transmute(T1, T2)(T2 item) if (T1.sizeof == T2.sizeof) {
 
 alias QGramSymbol = Nullable!(GramSymbol, GramSymbol(Empty()));
 
-Item[] findItemClosure(IProduction[] productions, Item item) {
-    return findItemClosure(productions, [item]);
-}
 Item[] findItemClosure(T)(IProduction[] productions, T items) 
 if (isInputRange!T && is(typeof(items.front) == Item)) 
 {
@@ -119,7 +130,7 @@ Item[] findItemGoto(IProduction[] productions, Item[] items, GramSymbol symbol) 
 Item[][] findStateSets(PContext ctx, GramSymbol[] symbolTable) {
     import std.stdio;
     Item aug = ctx.item(0, 0);
-    Item[][] c = [findItemClosure(ctx.productions, aug)];
+    Item[][] c = [findItemClosure(ctx.productions, [aug])];
     ulong clen = 0;
     while (true) {
         clen = c.length;
@@ -166,29 +177,30 @@ GramSymbol[] genSymbolTable(PContext ctx) {
     return [GramSymbol.eoi] ~ term2.array ~ nterm2.array;
 }
 
-/+
+//+
 unittest {
     import metaparse.parsing;
     import std.stdio;
     import std.algorithm;
+
+    writeln(" ~~ ~~~~ ~~ ",__FUNCTION__," ~~ ~~~~ ~~ ");
+
     auto ctx = PContext.fromString(q{
         E -> E + T | T;
         T -> T * F | F;
         F -> ( E ) | id;
-    }
-    );
-
-
-    ctx.parseProductions();
-    writeln("allSymbols", ctx.allSymbols);
+    });
     auto items = [ctx.item(0,0)];
     writeln(items);
-    writeln(findItemGoto(ctx, items, GramSymbol.nonTerminal("E")));
+    auto closure = findItemClosure(ctx.productions, items);
+    auto goTo = findItemGoto(ctx.productions, items, GramSymbol.nonTerminal("E"));
+    writefln!"Closure:\n%s"(closure);
+    writefln!"Goto:\n%s"(goTo);
 
-    //*
+    /+
     GramSymbol[] symbolTable = ctx.genSymbolTable;
     auto states = findStateSets(ctx, symbolTable);
     foreach(i,state; states) {
         writefln!"[%s]\n%-(    %s\n%)\n"(i, state);
-    }//*/
-}+/
+    }// +/
+}// +/
