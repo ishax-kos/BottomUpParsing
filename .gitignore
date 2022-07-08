@@ -14,3 +14,7 @@ bottomupbabyyy-test-*
 *.obj
 *.lst
 grammar/*
+.vs/ProjectSettings.json
+.vs/slnx.sqlite
+.vs/VSWorkspaceState.json
+.vs/bottomUpBabyyy/v15/.suo
