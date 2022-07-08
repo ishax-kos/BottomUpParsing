@@ -16,3 +16,4 @@ bottomupbabyyy-test-*
 grammar/*
 .vs
 .vscode
+.vscode/settings.json
