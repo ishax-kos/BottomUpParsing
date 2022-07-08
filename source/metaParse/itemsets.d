@@ -1,33 +1,65 @@
-module metaParse.itemsets;
+module metaparse.itemsets;
 
-import metaParse.types;
+import metaparse.types;
+import metaparse.parsing;
 
 import std.container.rbtree;
 import std.sumtype;
 import std.typecons;
+import std.array;
+import std.range;
+import std.algorithm;
 
-alias Unit = int[0];
-enum nil = Unit.init;
-alias Set(T...) = RedBlackTree!(T);
-alias set = redBlackTree;
+import std.stdio;
+
+
+
+// alias Unit = int[0];
+// enum nil = Unit.init;
+// alias Set(T) = T[];
+// auto set(T)(T[] items...) {
+//     return items;
+// }
+// auto set(T)(T range) 
+// if (isInputRange!T) {
+//     return range.array;
+// }
+
+int insert(T)(ref T[] s, T t) {
+    import std.algorithm: canFind;
+    
+    if (s.canFind(t)) {
+        return 0;
+    }
+    else {
+        s ~= t;
+        return 1;
+    }
+}
 
 struct Item {
-    uint production;
+    immutable IProduction* production;
     uint position;
 
-    int opCmp(const Item other) const {
-        int compare(T)(T a, T b) {
-            return a > b ? 1 : a < b ? -1 : 0;
-        }
-
-        int comp = compare(this.production, other.production);
-        if (comp == 0) {
-            comp = compare(this.position, other.position);
-        }
-        return comp;
+    bool empty() {
+        return (position >= production.length);
     }
-    auto opBinary(string op, R)(const R rhs) const {
+    GramSymbol front() {
+        if (empty) {return GramSymbol.empty;}
+        else {
+            return production.symbols[position];
+        }
+    }
+    auto opBinary(string op, R)(R rhs) {
         return Item(production, mixin("position ", op, " rhs"));
+    }
+
+    string toString() {
+        import std.conv;
+        import std.format;
+        auto sym = production.symbols.map!(a=>a.toGramString);
+        string tbody = chain( sym[0..position], ["·"], sym[position..$]).join();
+        return production.result.str ~ " -> " ~ tbody;
     }
 }
 
@@ -38,29 +70,22 @@ T1 transmute(T1, T2)(T2 item) if (T1.sizeof == T2.sizeof) {
 
 alias QGramSymbol = Nullable!(GramSymbol, GramSymbol(Empty()));
 
-GramSymbol getSymbolAtIndex(Context* ctx, Item item) {
-    Production prod = ctx.productions[item.production];
-    if (prod.symbols.length <= item.position) {
-        return GramSymbol(Empty());
-    } else {
-        return prod.symbols[item.position];
-    }
+Item[] findItemClosure(IProduction[] productions, Item item) {
+    return findItemClosure(productions, [item]);
 }
-Set!Item findItemClosure(Context* ctx, Item item) {
-    return findItemClosure(ctx, set(item));
-}
-Set!Item findItemClosure(Context* ctx, Set!Item items) {
-            import std.stdio;
-    Set!Item j = items.dup;
+Item[] findItemClosure(T)(IProduction[] productions, T items) 
+if (isInputRange!T && is(typeof(items.front) == Item)) 
+{
+    Item[] j = items.array;
     while (true) {
         ulong jLength = j.length;
         foreach (Item item; j) {
-            GramSymbol symbol = ctx.getSymbolAtIndex(item);
+            GramSymbol symbol = item.front;
             symbol.match!(
                 (NonTerminal _) {
-                    foreach (pi, prod; ctx.productions) {
-                        if (prod.result == symbol) {
-                            j.insert(Item(cast(uint) pi, 0));
+                    foreach (pindex, prod; productions) {
+                        if (GramSymbol(prod.result) == symbol) {
+                            j.insert(Item(&prod, 0));
                         }
                     }
                 },
@@ -78,35 +103,92 @@ Set!Item findItemClosure(Context* ctx, Set!Item items) {
 }
 
 
-Set!Item findItemGoto(Context* ctx, Set!Item items, GramSymbol symbol) {
+Item[] findItemGoto(IProduction[] productions, Item[] items, GramSymbol symbol) {
     import std.stdio;
     import std.algorithm;
     import std.range;
-    Set!Item j = findItemClosure(ctx, items[].filter!(
-        item => getSymbolAtIndex(ctx, item) == symbol
-    ).map!(item => item + 1).set);
-    writeln("n");
+    
+    Item[] j = findItemClosure(productions, items[].filter!(
+        item => item.front == symbol
+    ).map!(item => item + 1).array);
 
     return j;
 }
 
-// uint[][] generateTable() {
 
-// }
-
-unittest {
-    import metaParse.parsing;
+Item[][] findStateSets(PContext ctx, GramSymbol[] symbolTable) {
     import std.stdio;
-    Context* ctx = Context.fromString(q{
+    Item aug = ctx.item(0, 0);
+    Item[][] c = [findItemClosure(ctx.productions, aug)];
+    ulong clen = 0;
+    while (true) {
+        clen = c.length;
+        foreach (itemSet; c) { 
+            foreach (symbol; symbolTable) {
+                Item[] gotoo = findItemGoto(ctx.productions, itemSet, symbol);
+                if (!gotoo.empty) {
+                    c.insert(gotoo);
+                }
+            } 
+        }
+        if (clen == c.length) {break;}
+    }
+    return c;
+}
+
+
+Item item(PContext ctx, int prod, int pos) {
+    assert(ctx.productions[prod].symbols.length >= pos);
+    return Item(
+        &ctx.productions[prod],
+        pos
+    );
+}
+
+
+GramSymbol[] genSymbolTable(PContext ctx) {
+    import std.stdio;
+
+    string[] nterm;
+    string[] term;
+    foreach (sym; ctx.allSymbols) {
+        sym.match!(
+            (NonTerminal a) { nterm ~= a.str; },
+            (Terminal a) { term ~= a.str; },
+            (_) {},
+        );
+    }
+    auto term2 = term.sort
+            .map!(a => GramSymbol.terminal(a));
+    auto nterm2 = nterm.sort
+            .map!(a => GramSymbol.nonTerminal(a));
+
+    return [GramSymbol.eoi] ~ term2.array ~ nterm2.array;
+}
+
+/+
+unittest {
+    import metaparse.parsing;
+    import std.stdio;
+    import std.algorithm;
+    auto ctx = PContext.fromString(q{
         E -> E + T | T;
         T -> T * F | F;
         F -> ( E ) | id;
     }
     );
 
-    ctx.parseRuleTable();
-    Set!Item items = set(Item(0,0));
-    Set!Item next = ctx.findItemClosure(items);
-    writeln("CLOSURE ", next);
-    writeln("GOTO ", ctx.findItemGoto(set(Item(0,1)), GramSymbol(Terminal("+"))));
-}
+
+    ctx.parseProductions();
+    writeln("allSymbols", ctx.allSymbols);
+    auto items = [ctx.item(0,0)];
+    writeln(items);
+    writeln(findItemGoto(ctx, items, GramSymbol.nonTerminal("E")));
+
+    //*
+    GramSymbol[] symbolTable = ctx.genSymbolTable;
+    auto states = findStateSets(ctx, symbolTable);
+    foreach(i,state; states) {
+        writefln!"[%s]\n%-(    %s\n%)\n"(i, state);
+    }//*/
+}+/

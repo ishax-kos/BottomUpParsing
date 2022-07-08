@@ -14,10 +14,16 @@ alias Action = SumType!(Shift, Reduce, Accept, ErrorState);
 
 struct Context {
     string input;
+    Production[] productions;
 
     static Context* newContext(string input_) {
         auto _this = new Context();
         _this.input = input_;
         return _this;
     }
+}
+
+struct Production {
+    ushort result;
+    ushort[] symbols;
 }

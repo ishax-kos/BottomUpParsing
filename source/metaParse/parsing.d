@@ -1,55 +1,137 @@
-module metaParse.parsing;
+module metaparse.parsing;
 
-import metaParse.types;
+import metaparse.types;
 
 import std.range;
 import std.algorithm;
 import std.array;
+import std.sumtype;
 
-alias Unit = int[0];
 
-// void internSymbols() {
+struct InputStreamString {
+    ulong inputPosition;
+    char[] fullInput;
+    dchar front() {
+        return fullInput[inputPosition];
+    }
 
-//     Production[] retprods;
-//     foreach (Production p; prods) {
-//         retprods ~= Production(
-//             lookup[cast(GramSymbol) p.result],
-//             p.symbols.map!(sym => lookup[sym])().array
-//         );
-//     }
-// }
+    void popFrontN(ulong num) {
+        inputPosition += num;
+    }
 
-// private struct Return {
-//     Production[] prods;
-//     uint[GramSymbol] symbolTable;
-// }
+    void popFront() {
+        popFrontN(1);
+    }
 
-void parseRuleTable(Context* ctx) {
-    import std.stdio;
+    bool empty() {
+        return inputPosition == fullInput.length;
+    }
+
+    InputStreamString save() {
+        return this;
+    }
+
+    ref auto opSlice(size_t start, size_t end) {
+        return fullInput[inputPosition .. $][start .. end];
+    }
+
+    ref auto opIndex(size_t index) {
+        return fullInput[inputPosition .. $][index];
+    }
+
+    size_t opDollar() {
+        return length;
+    }
+
+    size_t length() {
+        return fullInput.length - inputPosition;
+    }
+
+    string toString() const @safe pure nothrow {
+        return fullInput[inputPosition .. $].idup;
+    }
+
+    this(string s) {
+        this.fullInput = s.dup;
+    }
+}
+
+
+private class InternalContext {
+    InputStreamString input = "";
+    GramSymbol[] allSymbols;
+
+    GramSymbol getSymbol(GramSymbol g) {
+        if (allSymbols.canFind(g)) {
+        } else {
+            allSymbols ~= g;
+        }
+        return g;
+    }
+    static  /// Factory
+    InternalContext fromString(string s) {
+        auto ctx = new InternalContext();
+        ctx.input = InputStreamString(s);
+        return ctx;
+    }
+}
+
+alias PContext = immutable ParseContext;
+public class ParseContext {
+    IProduction[] productions = [];
+    GramSymbol[] allSymbols;
+
+    static 
+    PContext fromString(string s) {
+        auto baseCtx = InternalContext.fromString(s);
+        auto ctx = new ParseContext();
+        ctx.allSymbols = baseCtx.allSymbols;
+        ctx.productions = cast(immutable)(parseProductions(baseCtx).dup);
+        return cast(immutable) ctx;
+    }
+}
+
+
+private:
+
+Production[] parseProductions(InternalContext ctx) {
+    ctx.getSymbol(GramSymbol.eoi);
+    ctx.getSymbol(GramSymbol.empty);
 
     Production[] prods;
     while (!ctx.input.empty()) {
-        getWhiteSpace(ctx);
+        consumeWS(ctx);
         if (ctx.input.empty())
             break;
-        Production[] ruleProds = getProductions(ctx);
-        prods ~= ruleProds;
+        prods ~= parseRule(ctx);
     }
-
-    ctx.productions = prods;
+    Production aug = augmentProduction(prods[0]);
+    // auto newCtx = cast(ParseContext) ctx;
+    return aug~prods;
 }
 
-Production[] getProductions(Context* ctx) {
-    GramSymbol name = ctx.getSymbol(
-        GramSymbol(NonTerminal(getIdentifier(ctx)))
+
+Production augmentProduction(ref Production startProd) {
+    NonTerminal startSym = startProd.result;
+    NonTerminal augSym = NonTerminal(startSym.str ~ "'");
+    return Production(augSym, [GramSymbol(startSym)]);
+}
+
+
+Production[] parseRule(InternalContext ctx) {
+    NonTerminal name = ctx.getSymbol(
+        GramSymbol(NonTerminal(parseIdentifier(ctx)))
+    ).match!(
+        (NonTerminal nt) => nt, 
+        _ => throw new Error("")
     );
-    getWhiteSpace(ctx);
+    consumeWS(ctx);
     if (ctx.input[0 .. 2] != "->") {
         throw new Error("Missing arrow at:\n" ~ ctx.input.toString);
     }
 
     ctx.input.popFrontN(2);
-    getWhiteSpace(ctx);
+    consumeWS(ctx);
 
     GramSymbol[][] allSymbols;
 
@@ -58,11 +140,11 @@ Production[] getProductions(Context* ctx) {
         scope (exit)
             allSymbols ~= symbols;
         Bar: while (1) {
-            getWhiteSpace(ctx);
+            consumeWS(ctx);
             switch (ctx.input[0]) {
                 case 'A': .. case 'Z': {
                     symbols ~= ctx.getSymbol(
-                        cast(GramSymbol)NonTerminal(getIdentifier(ctx))
+                        cast(GramSymbol)NonTerminal(parseIdentifier(ctx))
                     );
                     break;
                 }
@@ -80,7 +162,7 @@ Production[] getProductions(Context* ctx) {
                 }
                 case 'a': .. case 'z': {
                     symbols ~= ctx.getSymbol(
-                        cast(GramSymbol)Terminal(getIdentifier(ctx))
+                        cast(GramSymbol)Terminal(parseIdentifier(ctx))
                     );
                     break;
                 }
@@ -101,7 +183,7 @@ Production[] getProductions(Context* ctx) {
     return prods;
 }
 
-string getIdentifier(Context* ctx) {
+string parseIdentifier(InternalContext ctx) {
     int len = 1;
     Loop: foreach (ch; ctx.input[1 .. $]) {
         switch (ch) {
@@ -125,7 +207,7 @@ string getIdentifier(Context* ctx) {
     return ret;
 }
 
-void getWhiteSpace(int Start = 0)(Context* ctx) {
+void consumeWS(int Start = 0)(InternalContext ctx) {
     int len = Start;
     Loop: foreach (ch; ctx.input[Start .. $]) {
         switch (ch) {
@@ -141,15 +223,15 @@ void getWhiteSpace(int Start = 0)(Context* ctx) {
     ctx.input.popFrontN(len);
 }
 
-alias getTailWhiteSpace = getWhiteSpace!1;
+alias getTailWhiteSpace = consumeWS!1;
 
 unittest {
-    import std.stdio;
+    // import std.stdio;
 
-    auto ctx = Context.fromString("E -> E + T | T;");
-    getWhiteSpace(ctx);
-    getIdentifier(ctx);
-    getWhiteSpace(ctx);
+    auto ctx = InternalContext.fromString("E -> E + T | T;");
+    consumeWS(ctx);
+    parseIdentifier(ctx);
+    consumeWS(ctx);
     assert(ctx.input[0 .. 2] == "->", ctx.input[0 .. 2]);
     ctx.input = cast(InputStreamString)q{
         E -> E + T | T;
