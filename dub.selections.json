@@ -1,6 +1,7 @@
 {
 	"fileVersion": 1,
 	"versions": {
+		"bcaa": "0.0.9",
 		"pegged": "0.4.6"
 	}
 }

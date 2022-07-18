@@ -1,6 +1,5 @@
 module metaparse.types;
 
-import metaparse.tablegen : Action;
 
 import std.sumtype;
 import std.meta : AliasSeq;
@@ -89,6 +88,14 @@ GramSymbol sum(T)(T value) pure {
     GramSymbol g;
     g.sum = GramSymbol.Sum(value);
     return g;
+}
+
+
+bool matches(T, S)(S sum) if (isSumType!S && __traits(compiles, S(T.init))) {
+    return sum.match!(
+        (T _) => true,
+        (_) => false
+    );
 }
 
 

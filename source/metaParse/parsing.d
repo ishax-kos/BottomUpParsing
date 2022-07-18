@@ -66,7 +66,7 @@ Production[] parseProductions(InputContext ctx) pure {
 
 Production augmentProduction(ref Production startProd) pure {
     NonTerminal startSym = startProd.result;
-    NonTerminal augSym = NonTerminal(startSym.str ~ "'");
+    NonTerminal augSym = NonTerminal("'");
     GramSymbol g;
     g.sum = GramSymbol.Sum(startSym);
     return new Production(augSym, [g]);
@@ -196,3 +196,17 @@ unittest {
     assert(parseCtx.allSymbols.length == 5, parseCtx.allSymbols.to!string);
     
 }
+// unittest {
+//     import std.conv;
+//     import std.stdio;
+//     writeln(" ~~ ~~~~ ~~ ",__FUNCTION__," ~~ ~~~~ ~~ ");
+//     auto ctx = InputContext.fromString(q{
+//         E -> E + T | T;
+//         T -> T * F | F;
+//         F -> ( E ) | id;
+//     });
+//     consumeWS(ctx);
+//     ctx.parseRule;
+
+//     writeln(ctx.allSymbols);
+// }

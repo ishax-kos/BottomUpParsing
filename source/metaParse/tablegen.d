@@ -3,6 +3,7 @@ module metaparse.tablegen;
 import metaparse.types;
 import metaparse.itemsets;
 import metaparse.parsing;
+import metaparse.tabletypes;
 
 import std.format;
 import std.algorithm;
@@ -10,42 +11,11 @@ import std.sumtype;
 import std.array;
 import std.range;
 import std.typecons;
+import std.conv;
+
 
 
 import std.stdio;
-
-enum {
-    ErrState,
-    Shift,
-    Reduce,
-    Accept,
-    ACTION_TYPE_MAX
-}
-struct Action {
-    ushort actionType;
-    ushort value;
-
-    this(T1,T2)(T1 at, T2 val) {
-        assert(at == Shift || at == Reduce);
-        actionType = cast(ushort) at;
-        assert(val < ushort.max);
-        value = cast(ushort) val;
-    }
-    this(T)(T at) {
-        assert(at == ErrState || at == Accept);
-        actionType = cast(ushort) at;
-    }
-
-    string toString() const @safe pure nothrow {
-        import std.conv;
-        final switch(actionType) {
-            case ErrState: return "";
-            case Shift: return "s" ~ value.to!string;
-            case Reduce: return "r" ~ value.to!string;
-            case Accept: return "Ac";
-        }
-    }
-}
 
 void addAction(ref Action[][] tblAction, ulong state, ulong symbol, Action newAction
 ) {
@@ -63,70 +33,92 @@ void addAction(ref Action[][] tblAction, ulong state, ulong symbol, Action newAc
 
 struct TableContext {
     Action[][] tblAction;
-    int[][] tblGoto;
+    GoTo[][] tblGoto;
 
     GramSymbol[] symbolKey;
 }
 
-TableContext parseGrammar(string input) {
-    auto ctx = PContext.fromString(input);
+TableContext buildTables(string s) {
+    return buildTables(PContext.fromString(s));
+}
 
-    GramSymbol[] symbolTable = genSymbolTable(ctx.allSymbols.dup);
+
+TableContext buildTables(PContext ctx) {
+
+    GramSymbol[] symbolTable = (ctx.allSymbols.dup);
     Item[][] states = ctx.findStateSets();
+    auto prodLookup = genProductionLookup(ctx.productions);
     
 
     // ushort[GramSymbol] symbolIndex;
     ushort[GramSymbol] terminals;
     ushort[GramSymbol] nonTerminals;
     
-    ushort ct, cn;
-    foreach_reverse (i, sym; symbolTable) {
+    
+    {ushort ct, cn;
+    foreach (i, sym; symbolTable) {
         if (i > ushort.max) {throw new Exception("Too many symbols.");}
 
         // symbolIndex[sym] = cast(ushort) i;
         sym.match!( 
             (Empty _) {},
             (NonTerminal _) {
+                if (sym !in nonTerminals)
                 nonTerminals[sym] = cn++;
             }, 
             (_) {
+                if (sym !in terminals)
                 terminals[sym] = ct++;
             } 
         );
-    }
+    }}
+    writeln(nonTerminals);
+    writeln(terminals);
 
     Action[][] tblAction = new Action[][states.length];
-    int[][] tblGoto = new int[][states.length];
+    GoTo[][] tblGoto = new GoTo[][states.length];
     // tblAction
     // tblAction.length = states.length;
     // tblGoto  .length = states.length;
     foreach(i; 0..states.length) {
         tblAction[i] = new Action[terminals.length];
-        tblGoto[i] = new int[nonTerminals.length];
+        tblGoto[i] = new GoTo[nonTerminals.length];
     }
-    
-    writeln(terminals);
 
     foreach (setIndex, set; states) {
+        import std.random;
 
-        foreach(f, item; set) {
+        foreach(item; set ) {
             if (item.empty) {
+                
                 if (item == ctx.item(0, 1)) {
+                    /// if at augment production
                     uint eoi = terminals[GramSymbol.eoi];
                     tblAction.addAction(setIndex, eoi, Action(Accept));
                 }
                 else {
+                    /// if at some production
                     GramSymbol sym = item.production.symbols[item.position-1];
-                    sym.match!(
-                        (NonTerminal _) {}, (Empty _) {},
-                        (_) {//Terminal
+                    GramSymbol[] followsA = findFollowSet(item.production.result, prodLookup);
+                    ushort pi = cast(ushort) ctx.productions.countUntil(item.production);
+                    writefln!"%s %s %s"(setIndex, followsA, pi);
+
+                    // assert(sym in terminals, sym.to!string);
+
+                    // auto handler(T)(T _) {//Terminal
+                        foreach (a; followsA) {//if(a == sym) {
                             tblAction.addAction(
-                                setIndex, terminals[sym], 
-                                Action(Reduce, cast(ushort) 
-                                    ctx.productions.countUntil(item.production))
+                                setIndex, terminals[a], 
+                                Action(Reduce, pi)
                             );
                         }
-                    );
+                    //writeln(a);//}
+                    // }
+                    // sym.match!(
+                    //     (NonTerminal _) {}, (Empty _) {},
+                    //     handler!Terminal,
+                    //     handler!EndOfInput
+                    // );
                 }
             }
             else {
@@ -146,40 +138,43 @@ TableContext parseGrammar(string input) {
             }
         }
 
-        uint a = 0;
         foreach (nt, nt_i; nonTerminals) {
             foreach (jsetIndex, Item[] setj; states) {
                 if (setj == findItemGoto(ctx.productions, set, nt)) {
-                    tblGoto[setIndex][a] = cast(int) jsetIndex;
+                    tblGoto[setIndex][nt_i] = GoTo(jsetIndex);
                 }
             }
-            a++;
         }
     }
     GramSymbol[] terms = new GramSymbol[terminals.length];
     foreach(k, v; terminals) {terms[v] = k;}
-
     return TableContext(tblAction, tblGoto, terms);
 }
-
-
 
 //+
 unittest {
     import std.conv;
     import std.stdio;
     writeln(" ~~ ~~~~ ~~ ",__FUNCTION__," ~~ ~~~~ ~~ ");
-    auto ctx = parseGrammar(q{
+    auto ctx = PContext.fromString(q{
         E -> E + T | T;
         T -> T * F | F;
         F -> ( E ) | id;
     });
+    TableContext tables = ctx.buildTables;
 
-    writefln!"    %-(%=4s%)"(ctx.symbolKey.map!(to!string));
-    foreach(i, row; ctx.tblAction) {
-        writef!"%3s["(i);
-        foreach(item; row) {
+    writefln!"    %-(%=4s%) ..."(
+        tables.symbolKey.map!(to!string)
+    );
+    foreach(r; 0..tables.tblAction.length) {
+        writef!"%3s["(r);
+        foreach(item; tables.tblAction[r]) {
             writef("%=4s", item.toString);
+        }
+        write("][");
+        
+        foreach(item; tables.tblGoto[r]) {
+            writef("%=4s", item.to!string);
         }
         writeln("]");
     }

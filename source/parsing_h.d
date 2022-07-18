@@ -1,4 +1,4 @@
-module parsing_h;
+module parsing_h__;
 
 import std.sumtype;
 

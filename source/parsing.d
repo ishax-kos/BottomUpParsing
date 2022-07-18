@@ -1,21 +1,22 @@
-// module testTwo;
+module testTwo;
 
-// import parsing_h;
-// import metaparse.tablegen;
+import parsing_h__;
+import metaparse.tablegen;
 
-// import std.sumtype;
-// import std.range;
+import std.sumtype;
+import std.range;
+import std.meta;
 
+//+
+immutable tableset = buildTables(q{
+    E -> E + T | T;
+    T -> T * F | F;
+    F -> ( E ) | id;
+});
 
-// // enum _old_context = parseGrammar(q{
-// //     E -> E + T | T;
-// //     T -> T * F | F;
-// //     F -> ( E ) | id;
-// // });
-
-// immutable uint[][] ACTION = _old_context.tblAction;
-
-// immutable uint[][] GOTO = _old_context.tblGoto;
+alias ACTION = Alias!(tableset.tblAction);
+alias GOTO = Alias!(tableset.tblGoto);
+// +/
 
 // struct SI {
 //     uint state;

@@ -9,32 +9,46 @@ import std.typecons;
 import std.array;
 import std.range;
 import std.algorithm;
+import std.meta;
 
 import std.stdio;
 
 
+// bool canFindItem(Item[] arr, Item compare) {
+//     foreach (item; arr) {
+//         if (item == compare) {return true;}
+//     }
+//     return false;
+// }
 
-// alias Unit = int[0];
-// enum nil = Unit.init;
-// alias Set(T) = T[];
-// auto set(T)(T[] items...) {
-//     return items;
-// }
-// auto set(T)(T range) 
-// if (isInputRange!T) {
-//     return range.array;
-// }
 
 int insert(T)(ref T[] s, T t) {
     import std.algorithm: canFind;
-    
-    if (s.canFind(t)) {
-        return 0;
+    // static if (is(T==Item)) {
+    //     if (s.canFindItem(t)) {
+    //         return 0;
+    //     }
+    //     else {
+    //         s ~= t;
+    //         return 1;
+    //     }
+    // } else {
+        if (s.canFind(t)) {
+            return 0;
+        }
+        else {
+            s ~= t;
+            return 1;
+        }
+    // }
+}
+
+int insert(T, R)(ref T[] set, R range) if (is(ElementType!R == T)) {
+    int accum = 0;
+    foreach (T val; range) {
+        accum += set.insert(val);
     }
-    else {
-        s ~= t;
-        return 1;
-    }
+    return accum;
 }
 
 struct Item {
@@ -59,17 +73,17 @@ struct Item {
         string tbody = sym[0..position].join(" ") ~ "·" ~ sym[position..$].join(" ");
         return production.result.str ~ " -> " ~ tbody;
     }
-    // int value(PContext ctx) const {
-    //     ctx.
-    //     int ret = productions;
-    //     if (ret == 0) {
-    //         ret = 
-    //             position > other.position ? 1 : 
-    //             position < other.position ? -1 : 
-    //             0;
-    //     }
-    //     return ret;
-    // }
+    bool opEquals(R)(const R other) const {
+        if (this.position != other.position) {return false;}
+        if (this.production.result != other.production.result) {return false;}
+        if (this.production.length != other.production.length) {return false;}
+        immutable GramSymbol[] prodA = this.production.symbols;
+        immutable GramSymbol[] prodB = other.production.symbols;
+        foreach (i; 0..prodA.length) {
+            if (prodA[i] != prodB[i]) {return false;}
+        }
+        return true;
+    }
 }
 
 T1 transmute(T1, T2)(T2 item) if (T1.sizeof == T2.sizeof) {
@@ -153,6 +167,84 @@ Item[][] findStateSets(PContext ctx) {
 }
 
 
+IProduction[][NonTerminal] genProductionLookup(IProduction[] productions) {
+    IProduction[][NonTerminal] productionMap;
+    foreach (prod; productions) {
+        if (prod.result !in productionMap) {productionMap[prod.result] = [];}
+        productionMap[prod.result] ~= prod;
+    }
+    return productionMap;
+}
+
+GramSymbol[] findFirstSet(GramSymbol x, IProduction[][NonTerminal] prodMap) {   
+    GramSymbol[] firsts;
+    x.match!(
+        (NonTerminal nt) {
+            foreach (IProduction prod; prodMap[nt]) {
+                GramSymbol[] fset;
+                foreach (s, symbol; prod) {
+                    if (symbol == x) {goto SkipOver;}
+                    fset = findFirstSet(symbol, prodMap); // buffer that long-ass shit.
+                    if (!fset.canFind(GramSymbol.empty)) { /// 90% of the time this is the only iteration.
+                        firsts.insert(fset);
+                        goto SkipOver;
+                    }
+                    else { //add first(that symbol) minus e
+                        firsts.insert(fset.filter!(s => s != GramSymbol.empty));
+                    }
+                }
+                firsts.insert(GramSymbol.empty);
+                SkipOver: {}
+            }
+        },
+        (_) {firsts = [x];},
+    );
+    return firsts;
+}
+
+auto findFollowSet(T)(T symB, IProduction[][NonTerminal] prodMap) {
+    return findFollowSet(cast(GramSymbol)symB, prodMap);
+}
+GramSymbol[] findFollowSet(GramSymbol symB, IProduction[][NonTerminal] prodMap) {
+    import std.algorithm;
+    GramSymbol[] followB;
+    if (prodMap[NonTerminal("'")][0][0] == symB) {
+        followB.insert(GramSymbol.eoi);
+    }
+    
+    foreach (prod; prodMap.byValue.joiner) {
+        foreach (i, sym; prod.symbols) {
+            /// It does not continue if it finds itself
+            if (sym == symB) {
+                // (if i is the last index)
+                if (prod.symbols.length == i+1) {
+                    /++ If there is a production A → aB, 
+                    then FOLLOW(B) ~= FOLLOW(A). +/
+                    followB.insert(findFollowSet(prod.result, prodMap));
+                } else {
+                    GramSymbol b = prod.symbols[i+1];
+                    auto firstB = findFirstSet(b, prodMap);
+                    if (firstB.canFind(GramSymbol.empty)) {
+                        /++ if A → aBb contains ε +/
+                        followB.insert(findFollowSet(prod.result, prodMap));
+                    }
+                    /++ If there is a production A → aBb, 
+                    then FOLLOW(B) ~= FIRST(b) sans ε. +/
+                    
+                    followB.insert(firstB.filter!(a => !a.matches!Empty));
+                }
+            }
+        }
+        // if (symB == GramSymbol(prod.result)) {
+        //     writeln(prod);
+        //     followB.insert(findFollowSet(prod[$-1], prodMap));
+        //     write(".");
+        // }//bleh!!!
+    }
+    return followB.dup;
+}
+
+
 Item item(PContext ctx, int prod, int pos) {
     assert(ctx.productions[prod].symbols.length >= pos);
     return Item(
@@ -182,7 +274,7 @@ GramSymbol[] genSymbolTable(GramSymbol[] allSymbols) pure {
     return [GramSymbol.eoi] ~ term2.array ~ nterm2.array;
 }
 
-//+
+/+
 unittest {
     import metaparse.parsing;
     import std.stdio;
@@ -190,11 +282,33 @@ unittest {
 
     writeln(" ~~ ~~~~ ~~ ",__FUNCTION__," ~~ ~~~~ ~~ ");
 
+    // auto ctx = PContext.fromString(q{
+    //     T -> F -;
+    //     F -> () | I id;
+    //     I -> id | ;
+    // });
+    // E {$ ) + }
     auto ctx = PContext.fromString(q{
-        E -> E + T | T;
-        T -> T * F | F;
-        F -> ( E ) | id;
+        E -> E + T;
+        E -> T;
+        T -> T * F;
+        T -> F;
+        F -> ( E );
+        F -> id;
     });
+
+    /+
+    writeln("Prod ", ctx.productions[0]);
+    auto prodLookup = genProductionLookup(ctx.productions);
+
+    writeln("Follow E ", findFollowSet(GramSymbol.nonTerminal("E"), prodLookup));
+    writeln("Follow id ", findFollowSet(GramSymbol.terminal("id"), prodLookup));
+    writeln(prodLookup[NonTerminal("'")]);
+    +//+
+    auto states = findStateSets(ctx);
+    foreach(i,state; states) {
+        writefln!"[%s]\n%-(    %s\n%)\n"(i, state);
+    +//+
     auto items = [ctx.item(0,0)];
     writefln!"Productions:\n%(    %s\n%)"(ctx.productions);
     auto closure = findItemClosure(ctx.productions, items);
@@ -202,11 +316,6 @@ unittest {
     auto goTo = findItemGoto(ctx.productions, items, GramSymbol.terminal("+"));
     writefln!"Closure:\n%(    %s\n%)"(closure);
     writefln!"Goto:\n%s"(goTo);
-
-    //+
-    auto states = findStateSets(ctx);
     writeln(ctx.allSymbols);
-    foreach(i,state; states) {
-        writefln!"[%s]\n%-(    %s\n%)\n"(i, state);
-    }// +/
+    // +/
 }// +/
