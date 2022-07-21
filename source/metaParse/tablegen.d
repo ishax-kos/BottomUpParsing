@@ -104,7 +104,7 @@ TableContext buildTables(PContext ctx) {
                     GramSymbol sym = item.production.symbols[item.position-1];
                     GramSymbol[] followsA = findFollowSet(item.production.result, prodLookup);
                     ushort pi = cast(ushort) ctx.productions.countUntil(item.production);
-                    writefln!"%s %s %s"(setIndex, followsA, pi);
+                    // writefln!"%s %s %s"(setIndex, followsA, pi);
 
                     // assert(sym in terminals, sym.to!string);
 

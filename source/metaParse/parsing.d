@@ -50,7 +50,7 @@ public class ParseContext {
 private:
 
 Production[] parseProductions(InputContext ctx) {
-    Production[] prods = [null]; /// The first spot is reserved
+    Production[] prods = [Production()]; /// The first spot is reserved
     while (!ctx.input.empty()) {
         consumeWS(ctx);
         if (ctx.input.empty())
@@ -69,7 +69,7 @@ Production augmentProduction(ref Production startProd) {
     NonTerminal augSym = NonTerminal("'");
     GramSymbol g;
     g.sum = GramSymbol.Sum(startSym);
-    return new Production(augSym, [g]);
+    return Production(augSym, [g]);
 }
 
 
@@ -130,7 +130,7 @@ Production[] parseRule(InputContext ctx) {
     }
     Production[] prods;
     foreach (list; allSymbols) {
-        prods ~= new Production(name, list);
+        prods ~= Production(name, list);
     }
     return prods;
 }

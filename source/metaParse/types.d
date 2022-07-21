@@ -93,6 +93,9 @@ struct GramSymbol {
     static bool less(GramSymbol a, GramSymbol b) {
         return a.opCmp(b) == -1;
     }
+    bool opEquals(R)(R other) const {
+        return this.opCmp(other) == 0;
+    }
 }
 
 
@@ -113,7 +116,7 @@ bool matches(T, S)(S sum) if (isSumType!S && __traits(compiles, S(T.init))) {
 
 /// Symbolic IProduction
 alias IProduction = immutable Production;
-class Production {
+struct Production {
     NonTerminal result;
     GramSymbol[] symbols;
     alias symbols this;
@@ -130,8 +133,11 @@ class Production {
         }
         return comp;
     }
+    bool opEquals(R)(R other) const {
+        return this.opCmp(other) == 0;
+    }
 
-    override
+    // override
     string toString() const {
         auto sym = symbols.map!(a=>a.toGramString);
         return result.str ~ " -> " ~ sym.join(" ");
