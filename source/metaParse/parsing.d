@@ -7,12 +7,14 @@ import std.algorithm;
 import std.array;
 import std.sumtype;
 
+import collections.treemap;
+alias TreeSet(T) = TreeMap!(T, void);
 
 private class InputContext {
     string input = "";
     GramSymbol[] allSymbols;
 
-    GramSymbol getSymbol(GramSymbol g) pure {
+    GramSymbol getSymbol(GramSymbol g) {
         if (allSymbols.canFind(g)) {
         } else {
             allSymbols ~= g;
@@ -20,7 +22,7 @@ private class InputContext {
         return g;
     }
     static  /// Factory
-    InputContext fromString(string s) pure {
+    InputContext fromString(string s) {
         auto ctx = new InputContext();
         ctx.input = s;
         return ctx;
@@ -33,7 +35,7 @@ public class ParseContext {
     GramSymbol[] allSymbols;
 
     static 
-    PContext fromString(string s) pure {
+    PContext fromString(string s) {
         auto baseCtx = InputContext.fromString(s);
         auto ctx = new ParseContext();
         ctx.productions = baseCtx.parseProductions().dup;
@@ -47,9 +49,8 @@ public class ParseContext {
 
 private:
 
-Production[] parseProductions(InputContext ctx) pure {
-
-    Production[] prods;
+Production[] parseProductions(InputContext ctx) {
+    Production[] prods = [null]; /// The first spot is reserved
     while (!ctx.input.empty()) {
         consumeWS(ctx);
         if (ctx.input.empty())
@@ -58,13 +59,12 @@ Production[] parseProductions(InputContext ctx) pure {
     }
     ctx.getSymbol(GramSymbol.eoi);
     ctx.getSymbol(GramSymbol.empty);
-    Production aug = augmentProduction(prods[0]);
-    // auto newCtx = cast(ParseContext) ctx;
-    return aug~prods;
+    prods[0] = augmentProduction(prods[1]);
+    return prods;
 }
 
 
-Production augmentProduction(ref Production startProd) pure {
+Production augmentProduction(ref Production startProd) {
     NonTerminal startSym = startProd.result;
     NonTerminal augSym = NonTerminal("'");
     GramSymbol g;
@@ -73,7 +73,7 @@ Production augmentProduction(ref Production startProd) pure {
 }
 
 
-Production[] parseRule(InputContext ctx) pure { 
+Production[] parseRule(InputContext ctx) { 
     NonTerminal name = NonTerminal(parseIdentifier(ctx));
     GramSymbol g; g.sum = GramSymbol.Sum(name);
     ctx.getSymbol(g);
@@ -135,7 +135,7 @@ Production[] parseRule(InputContext ctx) pure {
     return prods;
 }
 
-string parseIdentifier(InputContext ctx) pure {
+string parseIdentifier(InputContext ctx) {
     int len = 1;
     Loop: foreach (ch; ctx.input[1 .. $]) {
         switch (ch) {
@@ -159,7 +159,7 @@ string parseIdentifier(InputContext ctx) pure {
     return ret;
 }
 
-void consumeWS(int Start = 0)(InputContext ctx) pure {
+void consumeWS(int Start = 0)(InputContext ctx) {
     int len = Start;
     Loop: foreach (ch; ctx.input[Start .. $]) {
         switch (ch) {

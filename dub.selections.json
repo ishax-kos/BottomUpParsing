@@ -2,6 +2,7 @@
 	"fileVersion": 1,
 	"versions": {
 		"bcaa": "0.0.9",
+		"collections-d": "0.4.5",
 		"pegged": "0.4.6"
 	}
 }

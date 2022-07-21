@@ -19,6 +19,9 @@ struct Empty {
 
 struct NonTerminal {
     string str;
+    int opCmp(R)(const R other) const {
+        return cmp(this.str, other.str);
+    }
 }
 
 struct Terminal {
@@ -31,7 +34,7 @@ struct GramSymbol {
     SumType!(SymbolTypes) sum;
     alias sum this;
     alias Sum = typeof(sum);
-    int opCmp(const GramSymbol g2) const {
+    int opCmp(const GramSymbol g2) const pure @safe nothrow @nogc {
         import std.algorithm.comparison : cmp;
 
         return match!(
@@ -51,13 +54,18 @@ struct GramSymbol {
         )(this, g2);
     }
 
-    static GramSymbol nonTerminal(string value = "") pure {
+    auto opAssign(T)(T value) @trusted {
+        this.sum = cast(SumType!(SymbolTypes)) value;
+        return this;
+    }
+
+    static GramSymbol nonTerminal(string value = "") {
         GramSymbol g;
         g.sum = NonTerminal(value);
         return g;
     }
 
-    static GramSymbol terminal(string value = "") pure {
+    static GramSymbol terminal(string value = "") {
         GramSymbol g;
         g.sum = Terminal(value);
         return g;
@@ -71,20 +79,24 @@ struct GramSymbol {
             sum = SumType!(SymbolTypes)(node);
         }
     }
-    string toString() const pure {
+    string toString() const {
         return toGramString();
     }
-    string toGramString() const pure {
+    string toGramString() const {
         return sum.match!(
             (Empty _) => "_",
             (EndOfInput _) => "$",
             (e) => e.str,
         );
     }
+
+    static bool less(GramSymbol a, GramSymbol b) {
+        return a.opCmp(b) == -1;
+    }
 }
 
 
-GramSymbol sum(T)(T value) pure {
+GramSymbol sum(T)(T value) {
     GramSymbol g;
     g.sum = GramSymbol.Sum(value);
     return g;
@@ -106,17 +118,19 @@ class Production {
     GramSymbol[] symbols;
     alias symbols this;
     
-    this(NonTerminal a, GramSymbol[] b) pure {
+    this(NonTerminal a, GramSymbol[] b) {
         result = a;
         symbols = b;
     }
-    // ref auto opIndex(size_t index) const {
-    //     return symbols[index];
-    // }
+    
+    int opCmp(const Production other) const {
+        int comp = result.opCmp(other.result);
+        if (comp == 0) {
+            comp = cmp(symbols, other.symbols);
+        }
+        return comp;
+    }
 
-    // size_t length() const {
-    //     return symbols.length;
-    // }
     override
     string toString() const {
         auto sym = symbols.map!(a=>a.toGramString);

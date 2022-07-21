@@ -8,7 +8,7 @@ import std.range;
 import std.meta;
 
 //+
-immutable tableset = buildTables(q{
+auto tableset = buildTables(q{
     E -> E + T | T;
     T -> T * F | F;
     F -> ( E ) | id;

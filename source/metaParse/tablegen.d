@@ -13,7 +13,7 @@ import std.range;
 import std.typecons;
 import std.conv;
 
-
+import collections.treemap;
 
 import std.stdio;
 
@@ -51,8 +51,8 @@ TableContext buildTables(PContext ctx) {
     
 
     // ushort[GramSymbol] symbolIndex;
-    ushort[GramSymbol] terminals;
-    ushort[GramSymbol] nonTerminals;
+    TreeMap!(GramSymbol, ushort) terminals;
+    TreeMap!(GramSymbol, ushort) nonTerminals;
     
     
     {ushort ct, cn;
@@ -63,17 +63,20 @@ TableContext buildTables(PContext ctx) {
         sym.match!( 
             (Empty _) {},
             (NonTerminal _) {
-                if (sym !in nonTerminals)
+                // if (!nonTerminals.has(sym))
                 nonTerminals[sym] = cn++;
             }, 
             (_) {
-                if (sym !in terminals)
+                // if (!terminals.has(sym))
                 terminals[sym] = ct++;
             } 
         );
     }}
-    writeln(nonTerminals);
-    writeln(terminals);
+    // debug {
+        
+    // writeln(nonTerminals);
+    // writeln(terminals);
+    // }
 
     Action[][] tblAction = new Action[][states.length];
     GoTo[][] tblGoto = new GoTo[][states.length];

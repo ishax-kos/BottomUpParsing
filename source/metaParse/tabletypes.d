@@ -16,7 +16,7 @@ struct GoTo {
 
     private short state = errState__;
     private enum errState__ = cast(typeof(state)) -1;
-    string toString() const @safe pure nothrow {
+    string toString() const {
         import std.conv;
         if (state == errState__) return "";
         else return state.to!string;
@@ -38,7 +38,7 @@ struct Action {
         actionType = cast(ushort) at;
     }
 
-    string toString() const @safe pure nothrow {
+    string toString() const {
         import std.conv;
         final switch(actionType) {
             case ErrState: return "";
