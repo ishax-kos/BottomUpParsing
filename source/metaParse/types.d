@@ -17,8 +17,10 @@ struct EndOfInput {
 struct Empty {
 }
 
-struct NonTerminal {
-    string str;
+
+struct Nonterminal {
+    string str = "";
+
     int opCmp(R)(const R other) const {
         return cmp(this.str, other.str);
     }
@@ -28,7 +30,7 @@ struct Terminal {
     string str;
 }
 
-alias SymbolTypes = AliasSeq!(NonTerminal, Terminal, Empty, EndOfInput);
+alias SymbolTypes = AliasSeq!(Nonterminal, Terminal, Empty, EndOfInput);
 
 struct GramSymbol {
     SumType!(SymbolTypes) sum;
@@ -46,10 +48,10 @@ struct GramSymbol {
             (Empty e, _) => -1,
             (_, Empty e) => 1,
 
-            (NonTerminal n, Terminal t) => -1,
-            (Terminal t, NonTerminal n) => 1,
+            (Nonterminal n, Terminal t) => -1,
+            (Terminal t, Nonterminal n) => 1,
 
-            (NonTerminal a, NonTerminal b) { return cmp(a.str, b.str); },
+            (Nonterminal a, Nonterminal b) { return cmp(a.str, b.str); },
             (Terminal a, Terminal b) { return cmp(a.str, b.str); }
         )(this, g2);
     }
@@ -61,7 +63,7 @@ struct GramSymbol {
 
     static GramSymbol nonTerminal(string value = "") {
         GramSymbol g;
-        g.sum = NonTerminal(value);
+        g.sum = Nonterminal(value);
         return g;
     }
 
@@ -117,11 +119,11 @@ bool matches(T, S)(S sum) if (isSumType!S && __traits(compiles, S(T.init))) {
 /// Symbolic IProduction
 alias IProduction = immutable Production;
 struct Production {
-    NonTerminal result;
+    Nonterminal result;
     GramSymbol[] symbols;
     alias symbols this;
     
-    this(NonTerminal a, GramSymbol[] b) {
+    this(Nonterminal a, GramSymbol[] b) {
         result = a;
         symbols = b;
     }

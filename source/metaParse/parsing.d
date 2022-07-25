@@ -65,8 +65,8 @@ Production[] parseProductions(InputContext ctx) {
 
 
 Production augmentProduction(ref Production startProd) {
-    NonTerminal startSym = startProd.result;
-    NonTerminal augSym = NonTerminal("'");
+    Nonterminal startSym = startProd.result;
+    Nonterminal augSym = Nonterminal("'");
     GramSymbol g;
     g.sum = GramSymbol.Sum(startSym);
     return Production(augSym, [g]);
@@ -74,7 +74,7 @@ Production augmentProduction(ref Production startProd) {
 
 
 Production[] parseRule(InputContext ctx) { 
-    NonTerminal name = NonTerminal(parseIdentifier(ctx));
+    Nonterminal name = Nonterminal(parseIdentifier(ctx));
     GramSymbol g; g.sum = GramSymbol.Sum(name);
     ctx.getSymbol(g);
     consumeWS(ctx);

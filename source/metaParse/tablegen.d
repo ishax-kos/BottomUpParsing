@@ -12,13 +12,16 @@ import std.array;
 import std.range;
 import std.typecons;
 import std.conv;
+import std.bitmanip;
 
 import collections.treemap;
 
 import std.stdio;
 
-void addAction(ref Action[][] tblAction, ulong state, ulong symbol, Action newAction
-) {
+
+
+
+void addAction(ref Action[][] tblAction, ulong state, ulong symbol, Action newAction) {
     Action* tableCell = &(tblAction[state][symbol]);
     
     if (tableCell.actionType == ErrState) {
@@ -35,7 +38,13 @@ struct TableContext {
     Action[][] tblAction;
     GoTo[][] tblGoto;
 
-    GramSymbol[] symbolKey;
+    ushort[] prodResult;
+    ushort[][] prodBody;
+    
+    TreeMap!(GramSymbol, ushort) terminals;
+    TreeMap!(GramSymbol, ushort) nonTerminals;
+    
+    TreeMap!(Nonterminal, IProduction[]) prodLookup;
 }
 
 TableContext buildTables(string s) {
@@ -48,41 +57,43 @@ TableContext buildTables(PContext ctx) {
     GramSymbol[] symbolTable = (ctx.allSymbols.dup);
     Item[][] states = ctx.findStateSets();
     auto prodLookup = genProductionLookup(ctx.productions);
-    
 
-    // ushort[GramSymbol] symbolIndex;
+
+    /// Build index reference tables for terminals and nonterminals
     TreeMap!(GramSymbol, ushort) terminals;
     TreeMap!(GramSymbol, ushort) nonTerminals;
-    
+    TreeMap!(GramSymbol, ushort) symbolLookup;
     
     {ushort ct, cn;
     foreach (i, sym; symbolTable) {
         if (i > ushort.max) {throw new Exception("Too many symbols.");}
-
-        // symbolIndex[sym] = cast(ushort) i;
-        sym.match!( 
+        sym.match!(
             (Empty _) {},
-            (NonTerminal _) {
-                // if (!nonTerminals.has(sym))
-                nonTerminals[sym] = cn++;
-            }, 
+            (Nonterminal _) {
+                nonTerminals[sym] = cn;
+                symbolLookup[sym] = cast(ushort) ~cn;
+                cn++;
+            },
             (_) {
-                // if (!terminals.has(sym))
-                terminals[sym] = ct++;
-            } 
+                terminals[sym] = ct;
+                symbolLookup[sym] = ct;
+                ct++;
+            }
         );
     }}
-    // debug {
-        
-    // writeln(nonTerminals);
-    // writeln(terminals);
-    // }
+    
+    ushort[] prodResult = new ushort[ctx.productions.length-1];
+    ushort[][] prodBody = new ushort[][ctx.productions.length-1];
+    foreach (i, prod; ctx.productions[1..$]) {
+        prodResult[i] = nonTerminals[GramSymbol(prod.result)];
+        prodBody[i] = prod.symbols.map!(s => symbolLookup[s]).array;
+    }
+    
 
+    /// Build goto and action tables.
     Action[][] tblAction = new Action[][states.length];
     GoTo[][] tblGoto = new GoTo[][states.length];
-    // tblAction
-    // tblAction.length = states.length;
-    // tblGoto  .length = states.length;
+    
     foreach(i; 0..states.length) {
         tblAction[i] = new Action[terminals.length];
         tblGoto[i] = new GoTo[nonTerminals.length];
@@ -96,40 +107,31 @@ TableContext buildTables(PContext ctx) {
                 
                 if (item == ctx.item(0, 1)) {
                     /// if at augment production
+                    /// Add the 'Accept' action
                     uint eoi = terminals[GramSymbol.eoi];
                     tblAction.addAction(setIndex, eoi, Action(Accept));
                 }
                 else {
                     /// if at some production
-                    GramSymbol sym = item.production.symbols[item.position-1];
+                    /// Add a 'Reduce' action
                     GramSymbol[] followsA = findFollowSet(item.production.result, prodLookup);
                     ushort pi = cast(ushort) ctx.productions.countUntil(item.production);
-                    // writefln!"%s %s %s"(setIndex, followsA, pi);
 
-                    // assert(sym in terminals, sym.to!string);
-
-                    // auto handler(T)(T _) {//Terminal
-                        foreach (a; followsA) {//if(a == sym) {
-                            tblAction.addAction(
-                                setIndex, terminals[a], 
-                                Action(Reduce, pi)
-                            );
-                        }
-                    //writeln(a);//}
-                    // }
-                    // sym.match!(
-                    //     (NonTerminal _) {}, (Empty _) {},
-                    //     handler!Terminal,
-                    //     handler!EndOfInput
-                    // );
+                    foreach (a; followsA) {
+                        tblAction.addAction(
+                            setIndex, terminals[a], 
+                            Action(Reduce, pi)
+                        );
+                    }
                 }
             }
             else {
+                /// Add a 'Shift' action
                 foreach (jsetIndex, Item[] setj; states) {
                     GramSymbol itemFront = item.front;
                     
                     itemFront.match!(
-                        (NonTerminal _) {}, (Empty _) {},
+                        (Nonterminal _) {}, (Empty _) {},
                         (_) {
                             if (setj == findItemGoto(ctx.productions, set, itemFront)) {
                                 ushort index = terminals[itemFront];
@@ -140,7 +142,7 @@ TableContext buildTables(PContext ctx) {
                 }
             }
         }
-
+        /// Goto table building
         foreach (nt, nt_i; nonTerminals) {
             foreach (jsetIndex, Item[] setj; states) {
                 if (setj == findItemGoto(ctx.productions, set, nt)) {
@@ -149,9 +151,16 @@ TableContext buildTables(PContext ctx) {
             }
         }
     }
-    GramSymbol[] terms = new GramSymbol[terminals.length];
-    foreach(k, v; terminals) {terms[v] = k;}
-    return TableContext(tblAction, tblGoto, terms);
+    // GramSymbol[] terms = new GramSymbol[terminals.length];
+    // foreach(k, v; terminals) {terms[v] = k;}
+
+
+
+    return TableContext(
+        tblAction, tblGoto, 
+        prodResult, prodBody,
+        terminals, nonTerminals,
+        prodLookup);
 }
 
 //+
@@ -166,9 +175,9 @@ unittest {
     });
     TableContext tables = ctx.buildTables;
 
-    writefln!"    %-(%=4s%) ..."(
-        tables.symbolKey.map!(to!string)
-    );
+    // writefln!"    %-(%=4s%) ..."(
+    //     tables.symbolKey.map!(to!string)
+    // );
     foreach(r; 0..tables.tblAction.length) {
         writef!"%3s["(r);
         foreach(item; tables.tblAction[r]) {

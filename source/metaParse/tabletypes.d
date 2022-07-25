@@ -13,8 +13,9 @@ struct GoTo {
     this (T) (T value) {
         state = cast(typeof(state)) value;
     }
+    
 
-    private short state = errState__;
+    short state = errState__;
     private enum errState__ = cast(typeof(state)) -1;
     string toString() const {
         import std.conv;

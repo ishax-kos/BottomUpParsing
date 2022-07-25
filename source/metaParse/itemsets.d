@@ -107,7 +107,7 @@ if (isInputRange!T && is(typeof(items.front) == Item))
         foreach (Item item; j) {
             GramSymbol symbol = item.front;
             symbol.match!(
-                (NonTerminal nt) {
+                (Nonterminal nt) {
                     foreach (pindex, prod; productions) {
                         if (sum(prod.result) == symbol) {
                             j.insert(Item(prod, 0));
@@ -170,8 +170,8 @@ Item[][] findStateSets(PContext ctx) {
 }
 
 
-TreeMap!(NonTerminal, IProduction[]) genProductionLookup(IProduction[] productions) {
-    TreeMap!(NonTerminal, IProduction[]) productionMap;
+TreeMap!(Nonterminal, IProduction[]) genProductionLookup(IProduction[] productions) {
+    TreeMap!(Nonterminal, IProduction[]) productionMap;
     foreach (prod; productions) {
         if (prod.result !in productionMap) {productionMap[prod.result] = [];}
         IProduction[] pList = productionMap[prod.result];
@@ -181,10 +181,10 @@ TreeMap!(NonTerminal, IProduction[]) genProductionLookup(IProduction[] productio
     return productionMap;
 }
 
-GramSymbol[] findFirstSet(GramSymbol x, TreeMap!(NonTerminal, IProduction[]) prodMap) {   
+GramSymbol[] findFirstSet(GramSymbol x, TreeMap!(Nonterminal, IProduction[]) prodMap) {   
     GramSymbol[] firsts;
     x.match!(
-        (NonTerminal nt) {
+        (Nonterminal nt) {
             foreach (IProduction prod; prodMap[nt]) {
                 GramSymbol[] fset;
                 foreach (s, symbol; prod) {
@@ -207,15 +207,15 @@ GramSymbol[] findFirstSet(GramSymbol x, TreeMap!(NonTerminal, IProduction[]) pro
     return firsts;
 }
 
-auto findFollowSet(T)(T symB, TreeMap!(NonTerminal, IProduction[]) prodMap) {
+auto findFollowSet(T)(T symB, TreeMap!(Nonterminal, IProduction[]) prodMap) {
     return findFollowSet(cast(GramSymbol)symB, prodMap);
 }
-GramSymbol[] findFollowSet(GramSymbol symB, TreeMap!(NonTerminal, IProduction[]) prodMap) {
+GramSymbol[] findFollowSet(GramSymbol symB, TreeMap!(Nonterminal, IProduction[]) prodMap) {
     import std.algorithm;
     GramSymbol[] followB;
     import std.stdio;
     // foreach (k, v; prodMap) {writef!"(%s : %s) "(k, v);} writeln();
-    // if (prodMap[NonTerminal("'")][0][0] == symB) {
+    // if (prodMap[Nonterminal("'")][0][0] == symB) {
     //     followB.insert(GramSymbol.eoi);
     // }
     
@@ -268,7 +268,7 @@ GramSymbol[] genSymbolTable(GramSymbol[] allSymbols) {
     string[] term;
     foreach (sym; allSymbols) {
         sym.match!(
-            (NonTerminal a) { nterm ~= a.str; },
+            (Nonterminal a) { nterm ~= a.str; },
             (Terminal a) { term ~= a.str; },
             (_) {},
         );
@@ -310,7 +310,7 @@ unittest {
 
     writeln("Follow E ", findFollowSet(GramSymbol.nonTerminal("E"), prodLookup));
     writeln("Follow id ", findFollowSet(GramSymbol.terminal("id"), prodLookup));
-    writeln(prodLookup[NonTerminal("'")]);
+    writeln(prodLookup[Nonterminal("'")]);
     +//+
     auto states = findStateSets(ctx);
     foreach(i,state; states) {
