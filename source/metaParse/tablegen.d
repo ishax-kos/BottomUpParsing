@@ -4,6 +4,7 @@ import metaparse.types;
 import metaparse.itemsets;
 import metaparse.parsing;
 import metaparse.tabletypes;
+import collections;
 
 import std.format;
 import std.algorithm;
@@ -12,9 +13,6 @@ import std.array;
 import std.range;
 import std.typecons;
 import std.conv;
-import std.bitmanip;
-
-import collections.treemap;
 
 import std.stdio;
 
@@ -41,10 +39,10 @@ struct TableContext {
     ushort[] prodResult;
     ushort[][] prodBody;
     
-    TreeMap!(GramSymbol, ushort) terminals;
-    TreeMap!(GramSymbol, ushort) nonTerminals;
+    ArrayMap!(GramSymbol, ushort) terminals;
+    ArrayMap!(Nonterminal, ushort) nonterminals;
     
-    TreeMap!(Nonterminal, IProduction[]) prodLookup;
+    ArrayMap!(Nonterminal, IProduction[]) prodLookup;
 }
 
 TableContext buildTables(string s) {
@@ -60,17 +58,17 @@ TableContext buildTables(PContext ctx) {
 
 
     /// Build index reference tables for terminals and nonterminals
-    TreeMap!(GramSymbol, ushort) terminals;
-    TreeMap!(GramSymbol, ushort) nonTerminals;
-    TreeMap!(GramSymbol, ushort) symbolLookup;
+    ArrayMap!(GramSymbol, ushort) terminals;
+    ArrayMap!(Nonterminal, ushort) nonterminals;
+    ArrayMap!(GramSymbol, ushort) symbolLookup;
     
     {ushort ct, cn;
     foreach (i, sym; symbolTable) {
         if (i > ushort.max) {throw new Exception("Too many symbols.");}
         sym.match!(
             (Empty _) {},
-            (Nonterminal _) {
-                nonTerminals[sym] = cn;
+            (Nonterminal nt) {
+                nonterminals[nt] = cn;
                 symbolLookup[sym] = cast(ushort) ~cn;
                 cn++;
             },
@@ -81,11 +79,10 @@ TableContext buildTables(PContext ctx) {
             }
         );
     }}
-    
     ushort[] prodResult = new ushort[ctx.productions.length-1];
     ushort[][] prodBody = new ushort[][ctx.productions.length-1];
     foreach (i, prod; ctx.productions[1..$]) {
-        prodResult[i] = nonTerminals[GramSymbol(prod.result)];
+        prodResult[i] = nonterminals[prod.result];
         prodBody[i] = prod.symbols.map!(s => symbolLookup[s]).array;
     }
     
@@ -96,7 +93,7 @@ TableContext buildTables(PContext ctx) {
     
     foreach(i; 0..states.length) {
         tblAction[i] = new Action[terminals.length];
-        tblGoto[i] = new GoTo[nonTerminals.length];
+        tblGoto[i] = new GoTo[nonterminals.length];
     }
 
     foreach (setIndex, set; states) {
@@ -115,7 +112,7 @@ TableContext buildTables(PContext ctx) {
                     /// if at some production
                     /// Add a 'Reduce' action
                     GramSymbol[] followsA = findFollowSet(item.production.result, prodLookup);
-                    ushort pi = cast(ushort) ctx.productions.countUntil(item.production);
+                    ushort pi = cast(ushort) ctx.productions[1..$].countUntil(item.production);
 
                     foreach (a; followsA) {
                         tblAction.addAction(
@@ -143,9 +140,9 @@ TableContext buildTables(PContext ctx) {
             }
         }
         /// Goto table building
-        foreach (nt, nt_i; nonTerminals) {
+        foreach (nt, nt_i; nonterminals) {
             foreach (jsetIndex, Item[] setj; states) {
-                if (setj == findItemGoto(ctx.productions, set, nt)) {
+                if (setj == findItemGoto(ctx.productions, set, GramSymbol(nt))) {
                     tblGoto[setIndex][nt_i] = GoTo(jsetIndex);
                 }
             }
@@ -159,7 +156,7 @@ TableContext buildTables(PContext ctx) {
     return TableContext(
         tblAction, tblGoto, 
         prodResult, prodBody,
-        terminals, nonTerminals,
+        terminals, nonterminals,
         prodLookup);
 }
 
@@ -175,9 +172,10 @@ unittest {
     });
     TableContext tables = ctx.buildTables;
 
-    // writefln!"    %-(%=4s%) ..."(
-    //     tables.symbolKey.map!(to!string)
-    // );
+    writefln!"    %-(%=4s%)  %-(%=4s%)"(
+        tables.terminals.byKey.map!(to!string),
+        tables.nonterminals.byKey.map!(nt=>nt.str)
+    );
     foreach(r; 0..tables.tblAction.length) {
         writef!"%3s["(r);
         foreach(item; tables.tblAction[r]) {

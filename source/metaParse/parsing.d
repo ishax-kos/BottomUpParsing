@@ -7,8 +7,7 @@ import std.algorithm;
 import std.array;
 import std.sumtype;
 
-import collections.treemap;
-alias TreeSet(T) = TreeMap!(T, void);
+// alias ArraySet(T) = ArrayMap!(T, void);
 
 private class InputContext {
     string input = "";

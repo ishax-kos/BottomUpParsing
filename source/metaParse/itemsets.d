@@ -2,6 +2,8 @@ module metaparse.itemsets;
 
 import metaparse.types;
 import metaparse.parsing;
+import collections;
+
 
 import std.container.rbtree;
 import std.sumtype;
@@ -10,8 +12,6 @@ import std.array;
 import std.range;
 import std.algorithm;
 import std.meta;
-
-import collections.treemap;
 
 import std.stdio;
 
@@ -137,10 +137,6 @@ Item[] findItemGoto(IProduction[] productions, Item[] items, GramSymbol symbol) 
         if (item.front == symbol) {
             j ~= item + 1;
         }
-        else {
-            
-        // writeln(item.front.tupleof, " isn't ", symbol.tupleof);
-        }
     }
 
     return findItemClosure(productions, j);
@@ -170,8 +166,8 @@ Item[][] findStateSets(PContext ctx) {
 }
 
 
-TreeMap!(Nonterminal, IProduction[]) genProductionLookup(IProduction[] productions) {
-    TreeMap!(Nonterminal, IProduction[]) productionMap;
+ArrayMap!(Nonterminal, IProduction[]) genProductionLookup(IProduction[] productions) {
+    ArrayMap!(Nonterminal, IProduction[]) productionMap;
     foreach (prod; productions) {
         if (prod.result !in productionMap) {productionMap[prod.result] = [];}
         IProduction[] pList = productionMap[prod.result];
@@ -181,7 +177,7 @@ TreeMap!(Nonterminal, IProduction[]) genProductionLookup(IProduction[] productio
     return productionMap;
 }
 
-GramSymbol[] findFirstSet(GramSymbol x, TreeMap!(Nonterminal, IProduction[]) prodMap) {   
+GramSymbol[] findFirstSet(GramSymbol x, ArrayMap!(Nonterminal, IProduction[]) prodMap) {   
     GramSymbol[] firsts;
     x.match!(
         (Nonterminal nt) {
@@ -207,17 +203,20 @@ GramSymbol[] findFirstSet(GramSymbol x, TreeMap!(Nonterminal, IProduction[]) pro
     return firsts;
 }
 
-auto findFollowSet(T)(T symB, TreeMap!(Nonterminal, IProduction[]) prodMap) {
+auto findFollowSet(T)(T symB, ArrayMap!(Nonterminal, IProduction[]) prodMap) {
     return findFollowSet(cast(GramSymbol)symB, prodMap);
 }
-GramSymbol[] findFollowSet(GramSymbol symB, TreeMap!(Nonterminal, IProduction[]) prodMap) {
+GramSymbol[] findFollowSet(GramSymbol symB, ArrayMap!(Nonterminal, IProduction[]) prodMap) {
     import std.algorithm;
     GramSymbol[] followB;
     import std.stdio;
-    // foreach (k, v; prodMap) {writef!"(%s : %s) "(k, v);} writeln();
-    // if (prodMap[Nonterminal("'")][0][0] == symB) {
-    //     followB.insert(GramSymbol.eoi);
-    // }
+
+
+    if (prodMap[Nonterminal("'")][0][0] == symB) {
+        auto sym = GramSymbol.eoi;
+        followB.insert(sym);
+    }
+
     
     foreach (k,v; prodMap) foreach (prod; v) {
         foreach (i, sym; prod.symbols) {
@@ -242,11 +241,6 @@ GramSymbol[] findFollowSet(GramSymbol symB, TreeMap!(Nonterminal, IProduction[])
                 }
             }
         }
-        // if (symB == GramSymbol(prod.result)) {
-        //     writeln(prod);
-        //     followB.insert(findFollowSet(prod[$-1], prodMap));
-        //     write(".");
-        // }//bleh!!!
     }
     return followB.dup;
 }
@@ -281,7 +275,7 @@ GramSymbol[] genSymbolTable(GramSymbol[] allSymbols) {
     return [GramSymbol.eoi] ~ term2.array ~ nterm2.array;
 }
 
-/+
+//+
 unittest {
     import metaparse.parsing;
     import std.stdio;
@@ -303,15 +297,15 @@ unittest {
         F -> ( E );
         F -> id;
     });
-
-    /+
+    //+
     writeln("Prod ", ctx.productions[0]);
     auto prodLookup = genProductionLookup(ctx.productions);
 
     writeln("Follow E ", findFollowSet(GramSymbol.nonTerminal("E"), prodLookup));
     writeln("Follow id ", findFollowSet(GramSymbol.terminal("id"), prodLookup));
     writeln(prodLookup[Nonterminal("'")]);
-    +//+
+    //+/
+    /+
     auto states = findStateSets(ctx);
     foreach(i,state; states) {
         writefln!"[%s]\n%-(    %s\n%)\n"(i, state);
