@@ -1,5 +1,6 @@
 module metaparse.types;
 
+import collections;
 
 import std.sumtype;
 import std.meta : AliasSeq;
@@ -144,4 +145,20 @@ struct Production {
         auto sym = symbols.map!(a=>a.toGramString);
         return result.str ~ " -> " ~ sym.join(" ");
     }
+}
+
+struct StaticTerminal {}
+struct DynamicTerminal {}
+struct CharSelection {}
+struct KleinStar {
+    ushort min, max;
+    LexSymbol* child;
+}
+alias LexSymbol = SumType!(
+    StaticTerminal, DynamicTerminal, 
+    CharSelection, KleinStar);
+
+struct LexRule {
+    string name;
+    ArraySet!LexSymbol symbols;
 }

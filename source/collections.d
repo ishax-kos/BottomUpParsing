@@ -55,9 +55,47 @@ template ArrayMap(K, V) {
         private K[] klist;
         private V[] vlist;
     }
-    // private struct Item {
-    //     K key;
-    //     alias key this;
-    //     V val;
-    // }
 }
+
+template ArraySet(K) {
+    struct ArraySet {
+        import core.exception; import std.conv;
+        ref K opIndex(size_t index) {
+            return klist[index];
+        }
+
+        int opApply(scope int delegate(K) dg) {
+            int result = 0;
+        
+            foreach (k; klist) {
+                result = dg(k);
+                if (result) {break;}
+            }
+        
+            return result;
+        }
+        bool opBinaryRight(string op)(const K checkkey) const 
+        if (op == "in") {
+            foreach (key; klist) {
+                if (key == checkkey) {return true;}
+            }
+            return false;
+        }
+        bool opOpAssign(string op)(const K val) const 
+        if (op == "~") {
+            foreach (key; klist) {
+                if (key == val) {return true;}
+            }
+            klist ~= val;
+            return false;
+        }
+
+        size_t length() const {return klist.length;}
+
+        auto byKey() const {return klist;}
+
+        private K[] klist;
+    }
+}
+
+alias Unit = int[0];
