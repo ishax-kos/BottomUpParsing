@@ -1,7 +1,7 @@
 module metaparse.itemsets;
 
 import metaparse.types;
-import metaparse.parsing;
+import metaparse.scanning;
 import collections;
 
 
@@ -12,6 +12,7 @@ import std.array;
 import std.range;
 import std.algorithm;
 import std.meta;
+import std.format;
 
 import std.stdio;
 
@@ -73,7 +74,10 @@ struct Item {
 
     string toString() {
         auto sym = production.symbols.map!(a=>a.toGramString);
-        string tbody = sym[0..position].join(" ") ~ "·" ~ sym[position..$].join(" ");
+        string tbody = format!"%s·%s"(
+            sym[0..position].join(" "),
+            sym[position..$].join(" ")
+        );
         return production.result.str ~ " -> " ~ tbody;
     }
     bool opEquals(R)(const R other) const {
@@ -277,25 +281,25 @@ GramSymbol[] genSymbolTable(GramSymbol[] allSymbols) {
 
 //+
 unittest {
-    import metaparse.parsing;
+    import metaparse.scanning;
     import std.stdio;
     import std.algorithm;
 
     writeln(" ~~ ~~~~ ~~ ",__FUNCTION__," ~~ ~~~~ ~~ ");
 
     // auto ctx = PContext.fromString(q{
-    //     T -> F -;
-    //     F -> () | I id;
+    //     T -> F "-";
+    //     F -> "(" ")" | I "id";
     //     I -> id | ;
     // });
     // E {$ ) + }
     auto ctx = PContext.fromString(q{
-        E -> E + T;
+        E -> E "+" T;
         E -> T;
-        T -> T * F;
+        T -> T "*" F;
         T -> F;
-        F -> ( E );
-        F -> id;
+        F -> "(" E ")";
+        F -> "id";
     });
     //+
     writeln("Prod ", ctx.productions[0]);

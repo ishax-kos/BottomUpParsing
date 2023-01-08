@@ -2,7 +2,7 @@ module metaparse.tablegen;
 
 import metaparse.types;
 import metaparse.itemsets;
-import metaparse.parsing;
+import metaparse.scanning;
 import metaparse.tabletypes;
 import collections;
 
@@ -55,7 +55,6 @@ TableContext buildTables(PContext ctx) {
     GramSymbol[] symbolTable = (ctx.allSymbols.dup);
     Item[][] states = ctx.findStateSets();
     auto prodLookup = genProductionLookup(ctx.productions);
-
 
     /// Build index reference tables for terminals and nonterminals
     ArrayMap!(GramSymbol, ushort) terminals;
@@ -166,9 +165,9 @@ unittest {
     import std.stdio;
     writeln(" ~~ ~~~~ ~~ ",__FUNCTION__," ~~ ~~~~ ~~ ");
     auto ctx = PContext.fromString(q{
-        E -> E + T | T;
-        T -> T * F | F;
-        F -> ( E ) | id;
+        E -> E "+" T | T;
+        T -> T "*" F | F;
+        F -> "(" E ")" | "id";
     });
     TableContext tables = ctx.buildTables;
 

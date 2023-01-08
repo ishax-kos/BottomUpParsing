@@ -1,4 +1,4 @@
-module metaparse.parsing;
+module metaparse.scanning;
 
 import metaparse.types;
 
@@ -6,6 +6,7 @@ import std.range;
 import std.algorithm;
 import std.array;
 import std.sumtype;
+import std.format;
 
 // alias ArraySet(T) = ArrayMap!(T, void);
 
@@ -33,12 +34,11 @@ public class ParseContext {
     Production[] productions = [];
     GramSymbol[] allSymbols;
 
-    static 
+    static /// Factory
     PContext fromString(string s) {
         auto baseCtx = InputContext.fromString(s);
         auto ctx = new ParseContext();
         ctx.productions = baseCtx.parseProductions().dup;
-        // import metaparse.itemsets: genSymbolTable;
         ctx.allSymbols = baseCtx.allSymbols.dup;
         import std.stdio;
         return cast(immutable) ctx;
@@ -73,7 +73,7 @@ Production augmentProduction(ref Production startProd) {
 
 
 Production[] parseRule(InputContext ctx) { 
-    Nonterminal name = Nonterminal(parseIdentifier(ctx));
+    Nonterminal name = Nonterminal(parseIdentifier(ctx.input));
     GramSymbol g; g.sum = GramSymbol.Sum(name);
     ctx.getSymbol(g);
     consumeWS(ctx);
@@ -86,16 +86,16 @@ Production[] parseRule(InputContext ctx) {
 
     GramSymbol[][] allSymbols;
 
-    Semi: while (1) {
+    TerminateRule: while (1) {
         GramSymbol[] symbols;
-        scope (exit)
+        scope (exit) 
             allSymbols ~= symbols;
-        Bar: while (1) {
+        OrPossibility: while (1) {
             consumeWS(ctx);
             switch (ctx.input[0]) {
                 case 'A': .. case 'Z': {
                     symbols ~= ctx.getSymbol(
-                        GramSymbol.nonTerminal(parseIdentifier(ctx))
+                        GramSymbol.nonTerminal(parseIdentifier(ctx.input))
                     );
                     break;
                 }
@@ -105,24 +105,40 @@ Production[] parseRule(InputContext ctx) {
                 }
                 case ';': {
                     ctx.input.popFront;
-                    break Semi;
+                    break TerminateRule;
                 }
                 case '|': {
                     ctx.input.popFront;
-                    break Bar;
+                    break OrPossibility;
+                }
+                case '"': {
+                    symbols ~= ctx.getSymbol(
+                        GramSymbol.terminal(parseString(ctx.input))
+                    );
+                    break;
                 }
                 case 'a': .. case 'z': {
-                    symbols ~= ctx.getSymbol(
-                        GramSymbol.terminal(parseIdentifier(ctx))
+                    throw new Error(
+                        format!"Have not yet implemented named terminals. '%s'"(
+                            ctx.input.front
+                        )
                     );
-                    break;
+                    // symbols ~= ctx.getSymbol(
+                    //     GramSymbol.terminal(parseIdentifier(ctx.input))
+                    // );
+                    // break;
                 }
                 default: {
-                    symbols ~= ctx.getSymbol(
-                        GramSymbol.terminal([ctx.input[0]])
+                    throw new Error(
+                        format!"Unidentifiable grammar character '%s'"(
+                            ctx.input.front
+                        )
                     );
-                    ctx.input.popFront;
-                    break;
+                    // symbols ~= ctx.getSymbol(
+                    //     GramSymbol.terminal([ctx.input[0]])
+                    // );
+                    // ctx.input.popFront;
+                    // break;
                 }
             }
         }
@@ -134,9 +150,9 @@ Production[] parseRule(InputContext ctx) {
     return prods;
 }
 
-string parseIdentifier(InputContext ctx) {
+string parseIdentifier(ref string input) {
     int len = 1;
-    Loop: foreach (ch; ctx.input[1 .. $]) {
+    Loop: foreach (ch; input[1 .. $]) {
         switch (ch) {
             case 'a': .. case 'z':
                 goto case '_';
@@ -153,10 +169,33 @@ string parseIdentifier(InputContext ctx) {
             }
         }
     }
-    auto ret = ctx.input[0 .. len].idup;
-    ctx.input.popFrontN(len);
+    auto ret = input[0 .. len].idup;
+    input.popFrontN(len);
     return ret;
 }
+
+string parseString(ref string input) {
+    assert (input.front == '"');
+    input.popFront();
+
+    int i = 0;
+    while (!input.empty()) {
+        if (input[i] == '"') {break;}
+
+        if (input[0..1] == "\\\"") {
+            // input.popFrontN(2);
+            i += 2;
+        }
+        else {
+            // input.popFront;
+            i += 1;
+        }
+    }
+    auto ret = input[0 .. i].idup;
+    input.popFrontN(i+1);
+    return ret;
+}
+
 
 void consumeWS(int Start = 0)(InputContext ctx) {
     int len = Start;
@@ -181,17 +220,17 @@ unittest {
     // import std.stdio;
     // writeln(" ~~ ~~~~ ~~ ",__FUNCTION__," ~~ ~~~~ ~~ ");
 
-    auto ctx = InputContext.fromString("E -> E + T | T;");
+    auto ctx = InputContext.fromString(q{E -> E "+" T | T;});
     consumeWS(ctx);
-    parseIdentifier(ctx);
+    parseIdentifier(ctx.input);
     consumeWS(ctx);
     assert(ctx.input[0 .. 2] == "->", ctx.input[0 .. 2]);
     
-    ctx = InputContext.fromString("E -> E + T | T;");
+    ctx = InputContext.fromString(q{E -> E "+" T | T;});
     ctx.parseRule();
     assert(ctx.allSymbols.length == 3, ctx.allSymbols.to!string);
 
-    auto parseCtx = ParseContext.fromString("E -> E + T | T;");
+    auto parseCtx = ParseContext.fromString(q{E -> E "+" T | T;});
     assert(parseCtx.allSymbols.length == 5, parseCtx.allSymbols.to!string);
     
 }
@@ -200,9 +239,9 @@ unittest {
 //     import std.stdio;
 //     writeln(" ~~ ~~~~ ~~ ",__FUNCTION__," ~~ ~~~~ ~~ ");
 //     auto ctx = InputContext.fromString(q{
-//         E -> E + T | T;
-//         T -> T * F | F;
-//         F -> ( E ) | id;
+//         E -> E "+" T | T;
+//         T -> T "*" F | F;
+//         F -> "(" E ")" | "id";
 //     });
 //     consumeWS(ctx);
 //     ctx.parseRule;
