@@ -1,9 +1,9 @@
-module metaparse.tablegen;
+module tablegen;
 
-import metaparse.types;
-import metaparse.itemsets;
-import metaparse.scanning;
-import metaparse.tabletypes;
+import types;
+import itemsets;
+import scanning;
+import tabletypes;
 import collections;
 
 import std.format;
@@ -165,13 +165,16 @@ unittest {
     import std.stdio;
     writeln(" ~~ ~~~~ ~~ ",__FUNCTION__," ~~ ~~~~ ~~ ");
     auto ctx = PContext.fromString(q{
+        C -> C "(" ")" | C "(" A ")" | E;
         E -> E "+" T | T;
         T -> T "*" F | F;
         F -> "(" E ")" | "id";
+
+        A -> A "," E;
     });
     TableContext tables = ctx.buildTables;
 
-    writefln!"    %-(%=4s%)  %-(%=4s%)"(
+    writefln("    %-(%=4s%)  %-(%=4s%)",
         tables.terminals.byKey.map!(to!string),
         tables.nonterminals.byKey.map!(nt=>nt.str)
     );

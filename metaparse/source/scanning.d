@@ -1,6 +1,6 @@
-module metaparse.scanning;
+module scanning;
 
-import metaparse.types;
+import types;
 
 import std.range;
 import std.algorithm;

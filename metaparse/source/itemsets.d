@@ -1,7 +1,8 @@
-module metaparse.itemsets;
+module itemsets;
 
-import metaparse.types;
-import metaparse.scanning;
+import types;
+import scanning;
+
 import collections;
 
 
@@ -170,6 +171,7 @@ Item[][] findStateSets(PContext ctx) {
 }
 
 
+// Not recursive
 ArrayMap!(Nonterminal, IProduction[]) genProductionLookup(IProduction[] productions) {
     ArrayMap!(Nonterminal, IProduction[]) productionMap;
     foreach (prod; productions) {
@@ -181,6 +183,8 @@ ArrayMap!(Nonterminal, IProduction[]) genProductionLookup(IProduction[] producti
     return productionMap;
 }
 
+
+// Recursive
 GramSymbol[] findFirstSet(GramSymbol x, ArrayMap!(Nonterminal, IProduction[]) prodMap) {   
     GramSymbol[] firsts;
     x.match!(
@@ -207,6 +211,8 @@ GramSymbol[] findFirstSet(GramSymbol x, ArrayMap!(Nonterminal, IProduction[]) pr
     return firsts;
 }
 
+
+// Recursive
 auto findFollowSet(T)(T symB, ArrayMap!(Nonterminal, IProduction[]) prodMap) {
     return findFollowSet(cast(GramSymbol)symB, prodMap);
 }
@@ -281,7 +287,7 @@ GramSymbol[] genSymbolTable(GramSymbol[] allSymbols) {
 
 //+
 unittest {
-    import metaparse.scanning;
+    import scanning;
     import std.stdio;
     import std.algorithm;
 

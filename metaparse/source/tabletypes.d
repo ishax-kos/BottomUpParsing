@@ -1,4 +1,4 @@
-module metaparse.tabletypes;
+module tabletypes;
 
 
 enum {
