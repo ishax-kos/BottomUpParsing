@@ -1,4 +1,4 @@
-module parsing;
+module scanning;
 
 import templexer;
 import context;

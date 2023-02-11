@@ -17,3 +17,5 @@ grammar/*
 .vs
 .vscode
 .vscode/settings.json
+test.d
+*.pdb

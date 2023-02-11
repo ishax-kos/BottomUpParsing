@@ -3,5 +3,5 @@ module lexing;
 import context;
 
 
-struct _symbol(string str) {};
+struct _Symbol(string str) {enum string str = str;}
 struct Value(string name) {string str;}

@@ -1,4 +1,4 @@
-module metaparse.types;
+module types;
 
 
 import std.sumtype;
